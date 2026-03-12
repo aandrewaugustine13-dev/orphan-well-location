@@ -28,6 +28,22 @@ const DEFAULT_CENTER_LAT = 33.5779;
 const DEFAULT_CENTER_LNG = -101.8552;
 const RADIUS_METERS = 16093;
 
+function MapEvents({ onMove }: { onMove: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    moveend(e) {
+      const center = e.target.getCenter();
+      onMove(center.lat, center.lng);
+    },
+  });
+
+  useEffect(() => {
+    onMove(DEFAULT_CENTER_LAT, DEFAULT_CENTER_LNG);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
+
 export default function Map() {
   const [wells, setWells] = useState<Well[]>([]);
 
@@ -55,28 +71,13 @@ export default function Map() {
     }
   }, []);
 
-  function MapEvents() {
-    useMapEvents({
-      moveend(e) {
-        const center = e.target.getCenter();
-        fetchWells(center.lat, center.lng);
-      },
-    });
-
-    useEffect(() => {
-      fetchWells(DEFAULT_CENTER_LAT, DEFAULT_CENTER_LNG);
-    }, []);
-
-    return null;
-  }
-
   return (
     <MapContainer
       center={[DEFAULT_CENTER_LAT, DEFAULT_CENTER_LNG]}
       zoom={10}
       style={{ width: "100vw", height: "100vh" }}
     >
-      <MapEvents />
+      <MapEvents onMove={fetchWells} />
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
