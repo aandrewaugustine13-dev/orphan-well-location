@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useCallback, useEffect, useState } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
@@ -24,47 +24,59 @@ interface Well {
   miles_away: number;
 }
 
-const CENTER_LAT = 33.5779;
-const CENTER_LON = -101.8552;
+const DEFAULT_CENTER_LAT = 33.5779;
+const DEFAULT_CENTER_LON = -101.8552;
 const RADIUS_METERS = 16093;
 
 export default function Map() {
   const [wells, setWells] = useState<Well[]>([]);
 
-  useEffect(() => {
-    async function fetchWells() {
-      if (!supabase) {
-        console.warn(
-          "Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
-        );
-        return;
-      }
-
-      const { data, error } = await supabase.rpc("get_wells_in_radius", {
-        center_lon: CENTER_LON,
-        center_lat: CENTER_LAT,
-        radius_meters: RADIUS_METERS,
-      });
-
-      if (error) {
-        console.error("Error fetching wells:", error);
-        return;
-      }
-
-      if (data) {
-        setWells(data as Well[]);
-      }
+  const fetchWells = useCallback(async (lat: number, lon: number) => {
+    if (!supabase) {
+      console.warn(
+        "Supabase client not initialized. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      );
+      return;
     }
 
-    fetchWells();
+    const { data, error } = await supabase.rpc("get_wells_in_radius", {
+      center_lon: lon,
+      center_lat: lat,
+      radius_meters: RADIUS_METERS,
+    });
+
+    if (error) {
+      console.error("Error fetching wells:", error);
+      return;
+    }
+
+    if (data) {
+      setWells(data as Well[]);
+    }
   }, []);
+
+  function MapUpdater() {
+    useMapEvents({
+      moveend(e) {
+        const center = e.target.getCenter();
+        fetchWells(center.lat, center.lng);
+      },
+    });
+
+    useEffect(() => {
+      fetchWells(DEFAULT_CENTER_LAT, DEFAULT_CENTER_LON);
+    }, [fetchWells]);
+
+    return null;
+  }
 
   return (
     <MapContainer
-      center={[CENTER_LAT, CENTER_LON]}
+      center={[DEFAULT_CENTER_LAT, DEFAULT_CENTER_LON]}
       zoom={10}
       style={{ width: "100vw", height: "100vh" }}
     >
+      <MapUpdater />
       <TileLayer
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
