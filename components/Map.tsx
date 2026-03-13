@@ -161,7 +161,7 @@ export default function Map({
             center={[well.latitude, well.longitude]}
             radius={isSelected ? 10 : isClose ? 7 : 5}
             pathOptions={{
-              fillColor: isClose ? "#ef4444" : isMedium ? "#f59e0b" : "#22c55e",
+              fillColor: isClose ? "#e5484d" : isMedium ? "#f0a000" : "#30a46c",
               fillOpacity: isSelected ? 1 : 0.75,
               color: isSelected ? "#fff" : "transparent",
               weight: isSelected ? 2 : 0,
@@ -171,50 +171,38 @@ export default function Map({
             }}
           >
             <Popup>
-              <div style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <div>
                 <div
                   style={{
-                    fontSize: "11px",
-                    color: "#9ba1b0",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.05em",
-                    marginBottom: "4px",
-                  }}
-                >
-                  Orphan Well
-                </div>
-                <div
-                  style={{
+                    fontFamily: "'IBM Plex Mono', monospace",
                     fontSize: "14px",
-                    fontWeight: 600,
-                    color: "#e8eaed",
-                    marginBottom: "8px",
+                    fontWeight: 500,
+                    color: "#f0f2f5",
+                    marginBottom: "6px",
                   }}
                 >
                   {well.api_number}
                 </div>
-                <div style={{ fontSize: "12px", color: "#9ba1b0" }}>
-                  <span
-                    style={{
-                      color: isClose ? "#ef4444" : isMedium ? "#f59e0b" : "#22c55e",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {well.miles_away.toFixed(2)} mi
-                  </span>{" "}
-                  from center
-                </div>
-                {well.operator_name && (
+                {well.well_name && (
                   <div
                     style={{
-                      fontSize: "11px",
-                      color: "#636a7e",
-                      marginTop: "4px",
+                      fontSize: "12px",
+                      color: "#8b95a8",
+                      marginBottom: "6px",
                     }}
                   >
-                    {well.operator_name}
+                    {well.well_name}
                   </div>
                 )}
+                <div
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 600,
+                    color: isClose ? "#e5484d" : isMedium ? "#f0a000" : "#30a46c",
+                  }}
+                >
+                  {well.miles_away.toFixed(2)} mi away
+                </div>
               </div>
             </Popup>
           </CircleMarker>
