@@ -7,41 +7,51 @@ interface LandingOverlayProps {
 export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
   return (
     <div
-      className="grid-texture"
       style={{
         position: "fixed",
         inset: 0,
         zIndex: 2000,
-        background: "var(--bg-abyss)",
+        background: "var(--bg-base)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        padding: "40px",
-        animation: "fade-in 0.5s ease-out",
+        padding: "40px 24px",
       }}
     >
-      {/* Hazard mark */}
-      <div style={{ marginBottom: "24px" }}>
-        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-          <path d="M20 6L36 34H4L20 6Z" stroke="var(--amber)" strokeWidth="1.5" fill="var(--amber-dim)" />
-          <circle cx="20" cy="28" r="1.5" fill="var(--amber)" />
-          <rect x="19.25" y="16" width="1.5" height="8" rx="0.75" fill="var(--amber)" />
+      {/* Logo mark */}
+      <div
+        style={{
+          width: "48px",
+          height: "48px",
+          borderRadius: "12px",
+          background: "var(--accent-soft)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: "28px",
+        }}
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="10" r="3" stroke="var(--accent)" strokeWidth="1.5" />
+          <path
+            d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8z"
+            stroke="var(--accent)"
+            strokeWidth="1.5"
+            fill="none"
+          />
         </svg>
       </div>
 
-      {/* Title */}
       <h1
         style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "clamp(32px, 5vw, 52px)",
-          fontWeight: 800,
-          letterSpacing: "0.06em",
-          textTransform: "uppercase",
-          color: "var(--text-bright)",
+          fontSize: "clamp(28px, 4vw, 40px)",
+          fontWeight: 700,
+          color: "var(--text-primary)",
           textAlign: "center",
           marginBottom: "12px",
-          lineHeight: 1.1,
+          letterSpacing: "-0.02em",
+          lineHeight: 1.15,
         }}
       >
         Orphan Well Locator
@@ -49,63 +59,50 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
 
       <p
         style={{
-          fontFamily: "var(--font-body)",
-          fontSize: "15px",
-          lineHeight: 1.7,
+          fontSize: "16px",
+          lineHeight: 1.6,
           color: "var(--text-secondary)",
           textAlign: "center",
-          maxWidth: "420px",
-          marginBottom: "36px",
+          maxWidth: "380px",
+          marginBottom: "32px",
         }}
       >
-        11,000+ abandoned wells mapped across Texas.
-        <br />
-        Pan, zoom, and search by radius to see what&apos;s near you.
+        11,000+ abandoned wells mapped across Texas. See what's near your
+        property in real time.
       </p>
 
-      {/* Enter */}
       <button
         onClick={onEnter}
         style={{
-          fontFamily: "var(--font-display)",
-          fontSize: "14px",
-          fontWeight: 700,
-          letterSpacing: "0.12em",
-          textTransform: "uppercase",
-          padding: "13px 44px",
-          background: "var(--amber-dim)",
-          color: "var(--amber)",
-          border: "1px solid var(--amber)",
-          borderRadius: "2px",
+          fontSize: "15px",
+          fontWeight: 600,
+          padding: "12px 32px",
+          background: "var(--accent)",
+          color: "#fff",
+          border: "none",
+          borderRadius: "var(--radius)",
           cursor: "pointer",
-          transition: "all 0.2s",
+          transition: "background 0.15s",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--amber)";
-          e.currentTarget.style.color = "var(--bg-abyss)";
-          e.currentTarget.style.boxShadow = "0 0 24px var(--amber-glow)";
+          e.currentTarget.style.background = "var(--accent-hover)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "var(--amber-dim)";
-          e.currentTarget.style.color = "var(--amber)";
-          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.background = "var(--accent)";
         }}
       >
         Open Map
       </button>
 
-      {/* Source tag */}
       <div
         style={{
           position: "absolute",
-          bottom: "20px",
-          fontFamily: "var(--font-mono)",
-          fontSize: "10px",
-          color: "var(--text-muted)",
-          letterSpacing: "0.06em",
+          bottom: "24px",
+          fontSize: "12px",
+          color: "var(--text-tertiary)",
         }}
       >
-        DATA: TX RAILROAD COMMISSION
+        Data from Texas Railroad Commission
       </div>
     </div>
   );
