@@ -37,108 +37,72 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="scan-lines" style={{ position: "relative", width: "100vw", height: "100vh" }}>
-      {/* Landing Overlay */}
+    <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
       {showLanding && <LandingOverlay onEnter={() => setShowLanding(false)} />}
 
-      {/* Status Bar */}
+      {/* Top bar */}
       <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           right: 0,
-          height: "36px",
-          background: "var(--bg-panel)",
-          borderBottom: "1px solid var(--border-amber)",
+          height: "40px",
+          background: "var(--bg-card)",
+          borderBottom: "1px solid var(--border)",
           zIndex: 999,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 16px",
+          padding: "0 20px",
           opacity: showLanding ? 0 : 1,
-          transition: "opacity 0.5s ease-out 0.3s",
+          transition: "opacity 0.3s ease-out",
         }}
       >
-        {/* Left */}
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <path d="M12 3L21 19H3L12 3Z" stroke="var(--amber)" strokeWidth="2" fill="var(--amber-dim)" />
-            </svg>
-            <span
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "12px",
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: "var(--text-bright)",
-              }}
-            >
-              OWL
-            </span>
-          </div>
-
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
           <div
             style={{
-              width: "1px",
-              height: "16px",
-              background: "var(--border)",
-            }}
-          />
-
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "10px",
-              color: "var(--text-muted)",
-              letterSpacing: "0.04em",
+              width: "24px",
+              height: "24px",
+              borderRadius: "6px",
+              background: "var(--accent-soft)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
             }}
           >
-            ORPHAN WELL LOCATOR — WEST TEXAS
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="10" r="3" stroke="var(--accent)" strokeWidth="2" />
+              <path d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8z" stroke="var(--accent)" strokeWidth="2" fill="none" />
+            </svg>
+          </div>
+          <span style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em" }}>
+            Orphan Well Locator
           </span>
         </div>
 
-        {/* Right */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          {/* Well count */}
           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
             <div
               style={{
-                width: "5px",
-                height: "5px",
+                width: "6px",
+                height: "6px",
                 borderRadius: "50%",
-                background: loading ? "var(--text-muted)" : wells.length > 0 ? "var(--amber)" : "var(--green)",
-                boxShadow: loading
-                  ? "none"
-                  : wells.length > 0
-                  ? "0 0 6px var(--amber-glow)"
-                  : "0 0 6px var(--green)",
+                background: loading ? "var(--text-tertiary)" : "var(--green)",
               }}
             />
-            <span
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "10px",
-                color: "var(--text-secondary)",
-              }}
-            >
-              {loading ? "SCANNING" : `${wells.length} DETECTED`}
+            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+              {loading ? "Scanning..." : `${wells.length} wells`}
             </span>
           </div>
-
-          <div style={{ width: "1px", height: "16px", background: "var(--border)" }} />
-
-          {/* Coordinates */}
           <span
             style={{
               fontFamily: "var(--font-mono)",
-              fontSize: "10px",
-              color: "var(--text-muted)",
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
             }}
           >
-            {center.lat.toFixed(4)}°N {Math.abs(center.lng).toFixed(4)}°W
+            {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
           </span>
         </div>
       </div>
@@ -147,12 +111,12 @@ export default function Home() {
       <div
         style={{
           position: "absolute",
-          top: "36px",
+          top: "40px",
           left: 0,
           right: 0,
           bottom: 0,
           opacity: showLanding ? 0 : 1,
-          transition: "opacity 0.8s ease-out",
+          transition: "opacity 0.5s ease-out",
         }}
       >
         <Map
@@ -168,7 +132,7 @@ export default function Home() {
 
       {/* Sidebar */}
       {!showLanding && (
-        <div style={{ position: "absolute", top: "36px", left: 0, bottom: 0, zIndex: 1000 }}>
+        <div style={{ position: "absolute", top: "40px", left: 0, bottom: 0, zIndex: 1000 }}>
           <Sidebar
             wells={wells}
             loading={loading}
