@@ -10,11 +10,20 @@ import {
   useMap,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
-import { supabase, Well } from "@/utils/supabase";
+import {
+  supabase,
+  Well,
+  ColorMode,
+  getWellColor,
+  getWellAge,
+  getWellYear,
+  formatLiability,
+  getProximityColor,
+  getAgeRadius,
+} from "@/utils/supabase";
 
 const DEFAULT_CENTER_LAT = 33.5779;
 const DEFAULT_CENTER_LNG = -101.8552;
-const DEFAULT_RADIUS = 16093; // ~10 miles in meters
 
 interface MapProps {
   onWellsLoaded: (wells: Well[]) => void;
@@ -24,6 +33,7 @@ interface MapProps {
   radiusMeters: number;
   selectedWellApi: string | null;
   onSelectWell: (api: string | null) => void;
+  colorMode: ColorMode;
 }
 
 function MapEventHandler({
@@ -32,7 +42,7 @@ function MapEventHandler({
   onCenterChange,
   onError,
   radiusMeters,
-}: Omit<MapProps, "selectedWellApi" | "onSelectWell">) {
+}: Omit<MapProps, "selectedWellApi" | "onSelectWell" | "colorMode">) {
   const fetchRef = useRef(false);
 
   const fetchWells = useCallback(
@@ -81,7 +91,6 @@ function MapEventHandler({
     },
   });
 
-  // Initial load
   useEffect(() => {
     if (!fetchRef.current) {
       fetchRef.current = true;
@@ -117,6 +126,7 @@ export default function Map({
   radiusMeters,
   selectedWellApi,
   onSelectWell,
+  colorMode,
 }: MapProps) {
   const [wells, setWells] = useState<Well[]>([]);
 
@@ -144,7 +154,6 @@ export default function Map({
       />
       <FlyToWell apiNumber={selectedWellApi} wells={wells} />
 
-      {/* Dark tile layer — CartoDB Dark Matter */}
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
@@ -152,16 +161,26 @@ export default function Map({
 
       {wells.map((well) => {
         const isSelected = well.api_number === selectedWellApi;
-        const isClose = well.miles_away <= 1;
-        const isMedium = well.miles_away <= 5;
+        const color = getWellColor(well, colorMode);
+        const age = getWellAge(well);
+        const proximityColor = getProximityColor(well.miles_away);
+
+        const radius =
+          colorMode === "age"
+            ? getAgeRadius(well, isSelected)
+            : isSelected
+            ? 10
+            : well.miles_away <= 1
+            ? 7
+            : 5;
 
         return (
           <CircleMarker
             key={well.api_number}
             center={[well.latitude, well.longitude]}
-            radius={isSelected ? 10 : isClose ? 7 : 5}
+            radius={radius}
             pathOptions={{
-              fillColor: isClose ? "#e5484d" : isMedium ? "#f0a000" : "#30a46c",
+              fillColor: color,
               fillOpacity: isSelected ? 1 : 0.75,
               color: isSelected ? "#fff" : "transparent",
               weight: isSelected ? 2 : 0,
@@ -171,37 +190,68 @@ export default function Map({
             }}
           >
             <Popup>
-              <div>
+              <div style={{ minWidth: "180px" }}>
+                {/* API Number */}
                 <div
                   style={{
                     fontFamily: "'IBM Plex Mono', monospace",
                     fontSize: "14px",
                     fontWeight: 500,
                     color: "#f0f2f5",
-                    marginBottom: "6px",
+                    marginBottom: "4px",
                   }}
                 >
                   {well.api_number}
                 </div>
+
+                {/* Well name */}
                 {well.well_name && (
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      color: "#8b95a8",
-                      marginBottom: "6px",
-                    }}
-                  >
+                  <div style={{ fontSize: "12px", color: "#8b95a8", marginBottom: "8px" }}>
                     {well.well_name}
                   </div>
                 )}
+
+                {/* Info grid */}
                 <div
                   style={{
-                    fontSize: "13px",
-                    fontWeight: 600,
-                    color: isClose ? "#e5484d" : isMedium ? "#f0a000" : "#30a46c",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "6px 12px",
+                    fontSize: "12px",
                   }}
                 >
-                  {well.miles_away.toFixed(2)} mi away
+                  <div>
+                    <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Distance</div>
+                    <div style={{ color: proximityColor, fontWeight: 600 }}>
+                      {well.miles_away.toFixed(2)} mi
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Drilled</div>
+                    <div style={{ color: "#f0f2f5", fontWeight: 500 }}>
+                      {getWellYear(well)}
+                      {age !== null && (
+                        <span style={{ color: "#8b95a8", fontWeight: 400 }}> ({age}yr)</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {well.liability_est != null && (
+                    <div>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Est. Liability</div>
+                      <div style={{ color: "#f0f2f5", fontWeight: 500 }}>
+                        {formatLiability(well.liability_est)}
+                      </div>
+                    </div>
+                  )}
+
+                  {well.operator_name && (
+                    <div>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Operator</div>
+                      <div style={{ color: "#8b95a8" }}>{well.operator_name}</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </Popup>
