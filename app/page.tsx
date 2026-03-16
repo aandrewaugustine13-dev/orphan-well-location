@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import LandingOverlay from "@/components/LandingOverlay";
-import { Well } from "@/utils/supabase";
+import { Well, ColorMode } from "@/utils/supabase";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -19,6 +19,7 @@ export default function Home() {
   const [radiusMiles, setRadiusMiles] = useState(10);
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [colorMode, setColorMode] = useState<ColorMode>("proximity");
 
   const handleWellsLoaded = useCallback((data: Well[]) => {
     setWells(data);
@@ -127,6 +128,7 @@ export default function Home() {
           radiusMeters={Math.round(radiusMiles * MILES_TO_METERS)}
           selectedWellApi={selectedWellApi}
           onSelectWell={setSelectedWellApi}
+          colorMode={colorMode}
         />
       </div>
 
@@ -144,6 +146,8 @@ export default function Home() {
             isOpen={sidebarOpen}
             onToggle={() => setSidebarOpen(!sidebarOpen)}
             center={center}
+            colorMode={colorMode}
+            onColorModeChange={setColorMode}
           />
         </div>
       )}
