@@ -1,6 +1,13 @@
 "use client";
 
-import { Well } from "@/utils/supabase";
+import {
+  Well,
+  ColorMode,
+  getWellColor,
+  getWellAge,
+  getWellYear,
+  formatLiability,
+} from "@/utils/supabase";
 
 interface SidebarProps {
   wells: Well[];
@@ -13,29 +20,66 @@ interface SidebarProps {
   isOpen: boolean;
   onToggle: () => void;
   center: { lat: number; lng: number };
+  colorMode: ColorMode;
+  onColorModeChange: (mode: ColorMode) => void;
 }
 
-function ProximityBadge({ miles }: { miles: number }) {
-  const isClose = miles <= 1;
-  const isMedium = miles <= 5;
-  const color = isClose ? "var(--red)" : isMedium ? "var(--amber)" : "var(--green)";
-  const bg = isClose ? "var(--red-soft)" : isMedium ? "var(--amber-soft)" : "var(--green-soft)";
+function ProximityBadge({ well, colorMode }: { well: Well; colorMode: ColorMode }) {
+  const color = getWellColor(well, colorMode);
+  const age = getWellAge(well);
+
+  const label =
+    colorMode === "age"
+      ? age !== null
+        ? `${age}yr`
+        : "N/A"
+      : `${well.miles_away.toFixed(1)} mi`;
 
   return (
     <span
       style={{
         fontFamily: "var(--font-mono)",
-        fontSize: "12px",
+        fontSize: "11px",
         fontWeight: 500,
         color,
-        background: bg,
+        background: `${color}18`,
         padding: "3px 8px",
         borderRadius: "4px",
         whiteSpace: "nowrap",
       }}
     >
-      {miles.toFixed(1)} mi
+      {label}
     </span>
+  );
+}
+
+function ToggleButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flex: 1,
+        padding: "6px 0",
+        fontSize: "12px",
+        fontWeight: active ? 600 : 400,
+        color: active ? "var(--text-primary)" : "var(--text-tertiary)",
+        background: active ? "var(--bg-surface)" : "transparent",
+        border: "none",
+        borderRadius: "4px",
+        cursor: "pointer",
+        transition: "all 0.15s",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -50,11 +94,33 @@ export default function Sidebar({
   isOpen,
   onToggle,
   center,
+  colorMode,
+  onColorModeChange,
 }: SidebarProps) {
   const closeWells = wells.filter((w) => w.miles_away <= 1);
-  const nearWells = wells.filter((w) => w.miles_away > 1 && w.miles_away <= 5);
-  const sortedWells = [...wells].sort((a, b) => a.miles_away - b.miles_away);
-  const closestWell = sortedWells[0];
+  const sortedWells =
+    colorMode === "age"
+      ? [...wells].sort((a, b) => {
+          const ageA = getWellAge(a);
+          const ageB = getWellAge(b);
+          if (ageA === null && ageB === null) return 0;
+          if (ageA === null) return 1;
+          if (ageB === null) return -1;
+          return ageB - ageA;
+        })
+      : [...wells].sort((a, b) => a.miles_away - b.miles_away);
+
+  const closestWell = [...wells].sort((a, b) => a.miles_away - b.miles_away)[0];
+
+  // Age stats
+  const wellsWithAge = wells.filter((w) => getWellAge(w) !== null);
+  const oldestWell = wellsWithAge.sort(
+    (a, b) => (getWellAge(b) || 0) - (getWellAge(a) || 0)
+  )[0];
+  const oldWells = wells.filter((w) => (getWellAge(w) || 0) >= 50);
+
+  // Liability stats
+  const totalLiability = wells.reduce((sum, w) => sum + (w.liability_est || 0), 0);
 
   return (
     <>
@@ -169,9 +235,38 @@ export default function Sidebar({
           </div>
         </div>
 
+        {/* Color Mode Toggle */}
+        <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+          <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", marginBottom: "6px" }}>
+            Color by
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: "4px",
+              background: "var(--bg-base)",
+              borderRadius: "6px",
+              padding: "3px",
+            }}
+          >
+            <ToggleButton
+              active={colorMode === "proximity"}
+              onClick={() => onColorModeChange("proximity")}
+            >
+              Proximity
+            </ToggleButton>
+            <ToggleButton
+              active={colorMode === "age"}
+              onClick={() => onColorModeChange("age")}
+            >
+              Well Age
+            </ToggleButton>
+          </div>
+        </div>
+
         {/* Stats */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
             {[
               {
                 value: loading ? "\u2014" : wells.length,
@@ -213,18 +308,59 @@ export default function Sidebar({
                 >
                   {stat.value}
                 </div>
-                <div
-                  style={{
-                    fontSize: "11px",
-                    color: "var(--text-tertiary)",
-                    marginTop: "4px",
-                    fontWeight: 500,
-                  }}
-                >
+                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
                   {stat.label}
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Second row: age + liability */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+            <div
+              style={{
+                background: "var(--bg-base)",
+                borderRadius: "var(--radius-sm)",
+                padding: "12px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: oldWells.length > 0 ? "var(--red)" : "var(--text-tertiary)",
+                  lineHeight: 1.1,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {loading ? "\u2014" : oldWells.length}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
+                Over 50 years old
+              </div>
+            </div>
+            <div
+              style={{
+                background: "var(--bg-base)",
+                borderRadius: "var(--radius-sm)",
+                padding: "12px",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: "18px",
+                  fontWeight: 700,
+                  color: totalLiability > 0 ? "var(--amber)" : "var(--text-tertiary)",
+                  lineHeight: 1.1,
+                  letterSpacing: "-0.02em",
+                }}
+              >
+                {loading ? "\u2014" : formatLiability(totalLiability || null)}
+              </div>
+              <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
+                Est. liability in view
+              </div>
+            </div>
           </div>
         </div>
 
@@ -241,13 +377,7 @@ export default function Sidebar({
             <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
               Search Radius
             </span>
-            <span
-              style={{
-                fontSize: "14px",
-                fontWeight: 700,
-                color: "var(--accent)",
-              }}
-            >
+            <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>
               {radiusMiles} mi
             </span>
           </div>
@@ -286,9 +416,7 @@ export default function Sidebar({
             <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--red)", marginBottom: "2px" }}>
               Connection Error
             </div>
-            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-              {error}
-            </div>
+            <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>{error}</div>
           </div>
         )}
 
@@ -314,9 +442,7 @@ export default function Sidebar({
                 animation: "spin 0.8s linear infinite",
               }}
             />
-            <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
-              Scanning area...
-            </span>
+            <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>Scanning area...</span>
           </div>
         )}
 
@@ -335,6 +461,7 @@ export default function Sidebar({
 
           {sortedWells.map((well) => {
             const isSelected = well.api_number === selectedWellApi;
+            const age = getWellAge(well);
 
             return (
               <button
@@ -376,22 +503,28 @@ export default function Sidebar({
                   >
                     {well.api_number}
                   </div>
-                  {well.well_name && (
-                    <div
-                      style={{
-                        fontSize: "12px",
-                        color: "var(--text-tertiary)",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                        marginTop: "1px",
-                      }}
-                    >
-                      {well.well_name}
-                    </div>
-                  )}
+                  <div
+                    style={{
+                      fontSize: "11px",
+                      color: "var(--text-tertiary)",
+                      marginTop: "2px",
+                      display: "flex",
+                      gap: "8px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    {well.well_name && <span>{well.well_name}</span>}
+                    {age !== null && (
+                      <span style={{ color: age >= 50 ? "var(--red)" : "var(--text-tertiary)" }}>
+                        {getWellYear(well)} ({age}yr)
+                      </span>
+                    )}
+                    {well.liability_est != null && (
+                      <span>{formatLiability(well.liability_est)}</span>
+                    )}
+                  </div>
                 </div>
-                <ProximityBadge miles={well.miles_away} />
+                <ProximityBadge well={well} colorMode={colorMode} />
               </button>
             );
           })}
@@ -412,20 +545,20 @@ export default function Sidebar({
             Source: TX Railroad Commission
           </span>
           <div style={{ display: "flex", gap: "12px" }}>
-            {[
-              { color: "var(--red)", label: "< 1 mi" },
-              { color: "var(--amber)", label: "< 5 mi" },
-              { color: "var(--green)", label: "5+ mi" },
-            ].map(({ color, label }) => (
+            {(colorMode === "proximity"
+              ? [
+                  { color: "var(--red)", label: "< 1 mi" },
+                  { color: "var(--amber)", label: "< 5 mi" },
+                  { color: "var(--green)", label: "5+ mi" },
+                ]
+              : [
+                  { color: "var(--red)", label: "50+ yr" },
+                  { color: "var(--amber)", label: "30-50" },
+                  { color: "var(--green)", label: "< 30" },
+                ]
+            ).map(({ color, label }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
-                <div
-                  style={{
-                    width: "7px",
-                    height: "7px",
-                    borderRadius: "50%",
-                    background: color,
-                  }}
-                />
+                <div style={{ width: "7px", height: "7px", borderRadius: "50%", background: color }} />
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{label}</span>
               </div>
             ))}
