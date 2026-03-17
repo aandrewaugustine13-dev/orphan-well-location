@@ -121,14 +121,19 @@ function FlyToWell({
   skipFetchRef: React.MutableRefObject<boolean>;
 }) {
   const map = useMap();
+  const lastFlownTo = useRef<string | null>(null);
 
   useEffect(() => {
-    if (apiNumber) {
+    if (apiNumber && apiNumber !== lastFlownTo.current) {
       const well = wells.find((w) => w.api_number === apiNumber);
       if (well) {
+        lastFlownTo.current = apiNumber;
         skipFetchRef.current = true;
         map.flyTo([well.latitude, well.longitude], 14, { duration: 0.8 });
       }
+    }
+    if (!apiNumber) {
+      lastFlownTo.current = null;
     }
   }, [apiNumber, wells, map, skipFetchRef]);
 
@@ -204,7 +209,7 @@ export default function Map({
               weight: isSelected ? 2 : 0,
             }}
             eventHandlers={{
-              click: () => onSelectWell(well.api_number),
+              click: () => onSelectWell(isSelected ? null : well.api_number),
             }}
           >
             <Popup>
