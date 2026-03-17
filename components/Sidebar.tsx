@@ -383,7 +383,7 @@ export default function Sidebar({
                       whiteSpace: "nowrap",
                     }}
                   >
-                    {[well.operator_name, well.county].filter(Boolean).join(" \u00B7 ")}
+                    {[well.operator_name, well.county, well.state].filter(Boolean).join(" \u00B7 ")}
                   </div>
                 </div>
                 <Badge well={well} colorMode={colorMode} />
@@ -403,7 +403,7 @@ export default function Sidebar({
             justifyContent: "space-between",
           }}
         >
-          <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Source: TX Railroad Commission</span>
+          <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Source: USGS / State Agencies</span>
           <div style={{ display: "flex", gap: "12px" }}>
             {(colorMode === "proximity"
               ? [
