@@ -305,25 +305,6 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Radius */}
-        <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Search Radius</span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>{radiusMiles} mi</span>
-          </div>
-          <input
-            type="range"
-            min={1}
-            max={50}
-            value={radiusMiles}
-            onChange={(e) => onRadiusChange(Number(e.target.value))}
-          />
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-tertiary)", marginTop: "6px" }}>
-            <span>1 mi</span>
-            <span>50 mi</span>
-          </div>
-        </div>
-
         {/* Error */}
         {error && (
           <div style={{ margin: "12px 20px 0", padding: "12px 14px", background: "var(--red-soft)", borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
