@@ -67,8 +67,8 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
           marginBottom: "32px",
         }}
       >
-        11,000+ abandoned wells mapped across Texas. See what's near your
-        property in real time.
+        120,000+ abandoned wells mapped across 27 states. See what's near
+        your property in real time.
       </p>
 
       <button
@@ -102,7 +102,7 @@ export default function LandingOverlay({ onEnter }: LandingOverlayProps) {
           color: "var(--text-tertiary)",
         }}
       >
-        Data from Texas Railroad Commission
+        Data from USGS and state regulatory agencies
       </div>
     </div>
   );
