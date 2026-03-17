@@ -20,11 +20,15 @@ export default function Home() {
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [colorMode, setColorMode] = useState<ColorMode>("proximity");
+  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
   const handleCenterChange = useCallback((lat: number, lng: number) => setCenter({ lat, lng }), []);
   const handleError = useCallback((err: string | null) => setError(err), []);
+  const handleSearchLocation = useCallback((lat: number, lng: number) => {
+    setSearchLocation({ lat, lng });
+  }, []);
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
@@ -110,6 +114,7 @@ export default function Home() {
           selectedWellApi={selectedWellApi}
           onSelectWell={setSelectedWellApi}
           colorMode={colorMode}
+          searchLocation={searchLocation}
         />
       </div>
 
@@ -128,6 +133,7 @@ export default function Home() {
             center={center}
             colorMode={colorMode}
             onColorModeChange={setColorMode}
+            onSearchLocation={handleSearchLocation}
           />
         </div>
       )}
