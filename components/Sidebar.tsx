@@ -113,7 +113,7 @@ export default function Sidebar({
           onClick={onToggle}
           style={{
             position: "absolute",
-            top: "12px",
+            top: "90px",
             left: "12px",
             zIndex: 1000,
             background: "var(--bg-card)",
