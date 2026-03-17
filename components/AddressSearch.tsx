@@ -29,6 +29,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -39,6 +40,14 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, []);
 
   function normalizeLabel(value: string) {
@@ -62,11 +71,13 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
   async function search(q: string) {
     const trimmed = q.trim();
+    const requestId = ++requestIdRef.current;
 
     if (trimmed.length < 3) {
       setResults([]);
       setError(null);
       setShowResults(false);
+      setLoading(false);
       return;
     }
 
@@ -96,6 +107,8 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         );
       }
 
+      if (requestId !== requestIdRef.current) return;
+
       const normalized = data
         .map((item) => ({
           lat: Number(item.lat),
@@ -111,11 +124,14 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         setError("No results found. Try a full street address or valid US ZIP code.");
       }
     } catch {
+      if (requestId !== requestIdRef.current) return;
       setResults([]);
       setShowResults(false);
       setError("Could not geocode this location right now. Please try again.");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }
 

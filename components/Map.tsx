@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 import {
   CircleMarker,
   MapContainer,
@@ -11,13 +11,13 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  Well,
   ColorMode,
-  getWellColor,
+  Well,
   formatInactivity,
   formatLiability,
-  supabase,
   getInactivityRadius,
+  getWellColor,
+  supabase,
 } from "@/utils/supabase";
 
 interface MapProps {
@@ -32,28 +32,67 @@ interface MapProps {
   searchLocation: { lat: number; lng: number } | null;
 }
 
+interface ProgrammaticMove {
+  lat: number;
+  lng: number;
+  zoom?: number;
+  id: number;
+}
+
 const DEFAULT_CENTER: [number, number] = [39.8, -98.5];
 const DEFAULT_ZOOM = 5;
+const FETCH_DEBOUNCE_MS = 300;
+const MIN_CENTER_CHANGE_METERS = 20;
 
-function CenterSync({ center }: { center: [number, number] }) {
+function distanceMeters(a: [number, number], b: [number, number]) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const lat1 = toRad(a[0]);
+  const lat2 = toRad(b[0]);
+  const dLat = lat2 - lat1;
+  const dLng = toRad(b[1] - a[1]);
+
+  const sinLat = Math.sin(dLat / 2);
+  const sinLng = Math.sin(dLng / 2);
+  const h =
+    sinLat * sinLat +
+    Math.cos(lat1) * Math.cos(lat2) * sinLng * sinLng;
+
+  return 2 * 6371000 * Math.asin(Math.sqrt(h));
+}
+
+function MapController({
+  programmaticMove,
+  suppressNextMoveEndRef,
+  onUserMoveEnd,
+}: {
+  programmaticMove: ProgrammaticMove | null;
+  suppressNextMoveEndRef: MutableRefObject<boolean>;
+  onUserMoveEnd: (lat: number, lng: number) => void;
+}) {
   const map = useMap();
 
   useEffect(() => {
-    map.flyTo(center, Math.max(map.getZoom(), 10), { duration: 0.75 });
-  }, [center, map]);
+    if (!programmaticMove) return;
 
-  return null;
-}
+    const current = map.getCenter();
+    const target: [number, number] = [programmaticMove.lat, programmaticMove.lng];
+    const currentTuple: [number, number] = [current.lat, current.lng];
 
-function MapMoveListener({
-  onMoveEnd,
-}: {
-  onMoveEnd: (lat: number, lng: number) => void;
-}) {
+    if (distanceMeters(currentTuple, target) < 1) return;
+
+    suppressNextMoveEndRef.current = true;
+    map.flyTo(target, programmaticMove.zoom ?? map.getZoom(), { duration: 0.6 });
+  }, [map, programmaticMove, suppressNextMoveEndRef]);
+
   useMapEvents({
     moveend(e) {
+      if (suppressNextMoveEndRef.current) {
+        suppressNextMoveEndRef.current = false;
+        return;
+      }
+
       const c = e.target.getCenter();
-      onMoveEnd(c.lat, c.lng);
+      onUserMoveEnd(c.lat, c.lng);
     },
   });
 
@@ -71,42 +110,82 @@ export default function Map({
   colorMode,
   searchLocation,
 }: MapProps) {
-  const [center, setCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [mapCenter, setMapCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [queryCenter, setQueryCenter] = useState<[number, number]>(DEFAULT_CENTER);
+  const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
   const [wells, setWells] = useState<Well[]>([]);
-  const [mapReady, setMapReady] = useState(false);
-  const hasSearchRef = useRef(false);
+
+  const suppressNextMoveEndRef = useRef(false);
+  const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestIdRef = useRef(0);
+  const moveIdRef = useRef(0);
+
+  const applyCenterUpdate = useCallback((next: [number, number], immediateFetch: boolean) => {
+    setMapCenter((prev) => {
+      const changed = distanceMeters(prev, next) >= MIN_CENTER_CHANGE_METERS;
+      if (!changed) return prev;
+      return next;
+    });
+
+    if (immediateFetch) {
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+        fetchDebounceRef.current = null;
+      }
+      setQueryCenter(next);
+      return;
+    }
+
+    if (fetchDebounceRef.current) {
+      clearTimeout(fetchDebounceRef.current);
+    }
+
+    fetchDebounceRef.current = setTimeout(() => {
+      setQueryCenter(next);
+      fetchDebounceRef.current = null;
+    }, FETCH_DEBOUNCE_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (fetchDebounceRef.current) {
+        clearTimeout(fetchDebounceRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        if (hasSearchRef.current) return;
-        const next: [number, number] = [
-          position.coords.latitude,
-          position.coords.longitude,
-        ];
-        setCenter(next);
+        const next: [number, number] = [position.coords.latitude, position.coords.longitude];
+        applyCenterUpdate(next, true);
+        moveIdRef.current += 1;
+        setProgrammaticMove({ lat: next[0], lng: next[1], id: moveIdRef.current, zoom: 10 });
       },
       () => {
         // Keep default center on failure.
       },
       { enableHighAccuracy: false, timeout: 8000 }
     );
-  }, []);
+  }, [applyCenterUpdate]);
 
   useEffect(() => {
     if (!searchLocation) return;
-    hasSearchRef.current = true;
-    setCenter([searchLocation.lat, searchLocation.lng]);
-  }, [searchLocation]);
+
+    const next: [number, number] = [searchLocation.lat, searchLocation.lng];
+    applyCenterUpdate(next, true);
+    moveIdRef.current += 1;
+    setProgrammaticMove({ lat: next[0], lng: next[1], id: moveIdRef.current, zoom: 11 });
+  }, [applyCenterUpdate, searchLocation]);
 
   useEffect(() => {
-    onCenterChange(center[0], center[1]);
-  }, [center, onCenterChange]);
+    onCenterChange(mapCenter[0], mapCenter[1]);
+  }, [mapCenter, onCenterChange]);
 
   useEffect(() => {
-    let cancelled = false;
+    const requestId = ++requestIdRef.current;
 
     async function loadWells() {
       onLoadingChange(true);
@@ -114,17 +193,21 @@ export default function Map({
 
       if (!supabase) {
         onError("Supabase environment variables are missing.");
+        onWellsLoaded([]);
+        setWells([]);
         onLoadingChange(false);
         return;
       }
 
       const { data, error } = await supabase.rpc("get_wells_in_radius", {
-        user_lng: center[1],
-        user_lat: center[0],
+        user_lng: queryCenter[1],
+        user_lat: queryCenter[0],
         radius_meters: radiusMeters,
       });
 
-      if (cancelled) return;
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
 
       if (error) {
         onError(error.message);
@@ -141,27 +224,24 @@ export default function Map({
     }
 
     loadWells();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [center, radiusMeters, onError, onLoadingChange, onWellsLoaded]);
-
+  }, [queryCenter, radiusMeters, onError, onLoadingChange, onWellsLoaded]);
 
   return (
     <MapContainer
-      center={center}
+      center={DEFAULT_CENTER}
       zoom={DEFAULT_ZOOM}
       style={{ width: "100%", height: "100%" }}
-      whenReady={() => setMapReady(true)}
     >
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; CARTO'
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
 
-      {mapReady && <CenterSync center={center} />}
-      <MapMoveListener onMoveEnd={(lat, lng) => setCenter([lat, lng])} />
+      <MapController
+        programmaticMove={programmaticMove}
+        suppressNextMoveEndRef={suppressNextMoveEndRef}
+        onUserMoveEnd={(lat, lng) => applyCenterUpdate([lat, lng], false)}
+      />
 
       {wells.map((well) => {
         const isSelected = selectedWellApi === well.api_number;
@@ -196,7 +276,6 @@ export default function Map({
           </CircleMarker>
         );
       })}
-
     </MapContainer>
   );
 }
