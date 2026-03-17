@@ -15,7 +15,7 @@ export default function Home() {
   const [wells, setWells] = useState<Well[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [center, setCenter] = useState({ lat: 33.5779, lng: -101.8552 });
+  const [center, setCenter] = useState({ lat: 39.8, lng: -98.5 });
   const [radiusMiles, setRadiusMiles] = useState(10);
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
