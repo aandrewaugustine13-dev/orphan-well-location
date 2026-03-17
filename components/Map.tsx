@@ -41,8 +41,11 @@ function MapEventHandler({
   onCenterChange,
   onError,
   radiusMeters,
-}: Omit<MapProps, "selectedWellApi" | "onSelectWell" | "colorMode">) {
-  const fetchRef = useRef(false);
+  skipFetchRef,
+}: Omit<MapProps, "selectedWellApi" | "onSelectWell" | "colorMode"> & {
+  skipFetchRef: React.MutableRefObject<boolean>;
+}) {
+  const initRef = useRef(false);
 
   const fetchWells = useCallback(
     async (lat: number, lng: number) => {
@@ -84,6 +87,12 @@ function MapEventHandler({
 
   const map = useMapEvents({
     moveend() {
+      if (skipFetchRef.current) {
+        skipFetchRef.current = false;
+        const center = map.getCenter();
+        onCenterChange(center.lat, center.lng);
+        return;
+      }
       const center = map.getCenter();
       onCenterChange(center.lat, center.lng);
       fetchWells(center.lat, center.lng);
@@ -91,8 +100,8 @@ function MapEventHandler({
   });
 
   useEffect(() => {
-    if (!fetchRef.current) {
-      fetchRef.current = true;
+    if (!initRef.current) {
+      initRef.current = true;
       const center = map.getCenter();
       onCenterChange(center.lat, center.lng);
       fetchWells(center.lat, center.lng);
@@ -102,17 +111,26 @@ function MapEventHandler({
   return null;
 }
 
-function FlyToWell({ apiNumber, wells }: { apiNumber: string | null; wells: Well[] }) {
+function FlyToWell({
+  apiNumber,
+  wells,
+  skipFetchRef,
+}: {
+  apiNumber: string | null;
+  wells: Well[];
+  skipFetchRef: React.MutableRefObject<boolean>;
+}) {
   const map = useMap();
 
   useEffect(() => {
     if (apiNumber) {
       const well = wells.find((w) => w.api_number === apiNumber);
       if (well) {
+        skipFetchRef.current = true;
         map.flyTo([well.latitude, well.longitude], 14, { duration: 0.8 });
       }
     }
-  }, [apiNumber, wells, map]);
+  }, [apiNumber, wells, map, skipFetchRef]);
 
   return null;
 }
@@ -128,6 +146,7 @@ export default function Map({
   colorMode,
 }: MapProps) {
   const [wells, setWells] = useState<Well[]>([]);
+  const skipFetchRef = useRef(false);
 
   const handleWellsLoaded = useCallback(
     (data: Well[]) => {
@@ -150,8 +169,9 @@ export default function Map({
         onCenterChange={onCenterChange}
         onError={onError}
         radiusMeters={radiusMeters}
+        skipFetchRef={skipFetchRef}
       />
-      <FlyToWell apiNumber={selectedWellApi} wells={wells} />
+      <FlyToWell apiNumber={selectedWellApi} wells={wells} skipFetchRef={skipFetchRef} />
 
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
