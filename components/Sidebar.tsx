@@ -4,8 +4,7 @@ import {
   Well,
   ColorMode,
   getWellColor,
-  getWellAge,
-  getWellYear,
+  formatInactivity,
   formatLiability,
 } from "@/utils/supabase";
 
@@ -24,15 +23,11 @@ interface SidebarProps {
   onColorModeChange: (mode: ColorMode) => void;
 }
 
-function ProximityBadge({ well, colorMode }: { well: Well; colorMode: ColorMode }) {
+function Badge({ well, colorMode }: { well: Well; colorMode: ColorMode }) {
   const color = getWellColor(well, colorMode);
-  const age = getWellAge(well);
-
   const label =
-    colorMode === "age"
-      ? age !== null
-        ? `${age}yr`
-        : "N/A"
+    colorMode === "inactivity"
+      ? formatInactivity(well)
       : `${well.miles_away.toFixed(1)} mi`;
 
   return (
@@ -98,33 +93,21 @@ export default function Sidebar({
   onColorModeChange,
 }: SidebarProps) {
   const closeWells = wells.filter((w) => w.miles_away <= 1);
+  const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
+  const totalLiability = wells.reduce((sum, w) => sum + (w.liability_est || 0), 0);
+
   const sortedWells =
-    colorMode === "age"
-      ? [...wells].sort((a, b) => {
-          const ageA = getWellAge(a);
-          const ageB = getWellAge(b);
-          if (ageA === null && ageB === null) return 0;
-          if (ageA === null) return 1;
-          if (ageB === null) return -1;
-          return ageB - ageA;
-        })
+    colorMode === "inactivity"
+      ? [...wells].sort((a, b) => (b.months_inactive || 0) - (a.months_inactive || 0))
       : [...wells].sort((a, b) => a.miles_away - b.miles_away);
 
   const closestWell = [...wells].sort((a, b) => a.miles_away - b.miles_away)[0];
-
-  // Age stats
-  const wellsWithAge = wells.filter((w) => getWellAge(w) !== null);
-  const oldestWell = wellsWithAge.sort(
-    (a, b) => (getWellAge(b) || 0) - (getWellAge(a) || 0)
+  const longestInactive = [...wells].sort(
+    (a, b) => (b.months_inactive || 0) - (a.months_inactive || 0)
   )[0];
-  const oldWells = wells.filter((w) => (getWellAge(w) || 0) >= 50);
-
-  // Liability stats
-  const totalLiability = wells.reduce((sum, w) => sum + (w.liability_est || 0), 0);
 
   return (
     <>
-      {/* Collapsed toggle */}
       {!isOpen && (
         <button
           onClick={onToggle}
@@ -167,7 +150,6 @@ export default function Sidebar({
         </button>
       )}
 
-      {/* Panel */}
       <div
         style={{
           position: "absolute",
@@ -207,9 +189,7 @@ export default function Sidebar({
                 </svg>
               </div>
               <div>
-                <h1 style={{ fontSize: "16px", fontWeight: 700, letterSpacing: "-0.01em" }}>
-                  Orphan Wells
-                </h1>
+                <h1 style={{ fontSize: "16px", fontWeight: 700, letterSpacing: "-0.01em" }}>Orphan Wells</h1>
                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "1px" }}>
                   {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
                 </div>
@@ -235,7 +215,7 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* Color Mode Toggle */}
+        {/* Color toggle */}
         <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
           <div style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", marginBottom: "6px" }}>
             Color by
@@ -249,17 +229,11 @@ export default function Sidebar({
               padding: "3px",
             }}
           >
-            <ToggleButton
-              active={colorMode === "proximity"}
-              onClick={() => onColorModeChange("proximity")}
-            >
+            <ToggleButton active={colorMode === "proximity"} onClick={() => onColorModeChange("proximity")}>
               Proximity
             </ToggleButton>
-            <ToggleButton
-              active={colorMode === "age"}
-              onClick={() => onColorModeChange("age")}
-            >
-              Well Age
+            <ToggleButton active={colorMode === "inactivity"} onClick={() => onColorModeChange("inactivity")}>
+              Inactivity
             </ToggleButton>
           </div>
         </div>
@@ -268,11 +242,7 @@ export default function Sidebar({
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "10px" }}>
             {[
-              {
-                value: loading ? "\u2014" : wells.length,
-                label: "Total",
-                color: "var(--accent)",
-              },
+              { value: loading ? "\u2014" : wells.length, label: "Total", color: "var(--accent)" },
               {
                 value: loading ? "\u2014" : closeWells.length,
                 label: "Within 1 mi",
@@ -289,23 +259,8 @@ export default function Sidebar({
                     : "var(--green)",
               },
             ].map((stat) => (
-              <div
-                key={stat.label}
-                style={{
-                  background: "var(--bg-base)",
-                  borderRadius: "var(--radius-sm)",
-                  padding: "12px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "22px",
-                    fontWeight: 700,
-                    color: stat.color,
-                    lineHeight: 1.1,
-                    letterSpacing: "-0.02em",
-                  }}
-                >
+              <div key={stat.label} style={{ background: "var(--bg-base)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
+                <div style={{ fontSize: "22px", fontWeight: 700, color: stat.color, lineHeight: 1.1, letterSpacing: "-0.02em" }}>
                   {stat.value}
                 </div>
                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
@@ -314,51 +269,37 @@ export default function Sidebar({
               </div>
             ))}
           </div>
-
-          {/* Second row: age + liability */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-            <div
-              style={{
-                background: "var(--bg-base)",
-                borderRadius: "var(--radius-sm)",
-                padding: "12px",
-              }}
-            >
+            <div style={{ background: "var(--bg-base)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
               <div
                 style={{
                   fontSize: "18px",
                   fontWeight: 700,
-                  color: oldWells.length > 0 ? "var(--red)" : "var(--text-tertiary)",
+                  color: longAbandoned.length > 0 ? "var(--red)" : "var(--text-tertiary)",
                   lineHeight: 1.1,
-                  letterSpacing: "-0.02em",
                 }}
               >
-                {loading ? "\u2014" : oldWells.length}
+                {loading ? "\u2014" : longAbandoned.length}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
-                Over 50 years old
+                Inactive 10+ yr
               </div>
             </div>
-            <div
-              style={{
-                background: "var(--bg-base)",
-                borderRadius: "var(--radius-sm)",
-                padding: "12px",
-              }}
-            >
+            <div style={{ background: "var(--bg-base)", borderRadius: "var(--radius-sm)", padding: "12px" }}>
               <div
                 style={{
                   fontSize: "18px",
                   fontWeight: 700,
-                  color: totalLiability > 0 ? "var(--amber)" : "var(--text-tertiary)",
+                  color: longestInactive && (longestInactive.months_inactive || 0) >= 120 ? "var(--red)" : "var(--amber)",
                   lineHeight: 1.1,
-                  letterSpacing: "-0.02em",
                 }}
               >
-                {loading ? "\u2014" : formatLiability(totalLiability || null)}
+                {loading || !longestInactive
+                  ? "\u2014"
+                  : formatInactivity(longestInactive)}
               </div>
               <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", fontWeight: 500 }}>
-                Est. liability in view
+                Longest inactive
               </div>
             </div>
           </div>
@@ -366,20 +307,9 @@ export default function Sidebar({
 
         {/* Radius */}
         <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "10px",
-            }}
-          >
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
-              Search Radius
-            </span>
-            <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>
-              {radiusMiles} mi
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>Search Radius</span>
+            <span style={{ fontSize: "14px", fontWeight: 700, color: "var(--accent)" }}>{radiusMiles} mi</span>
           </div>
           <input
             type="range"
@@ -388,15 +318,7 @@ export default function Sidebar({
             value={radiusMiles}
             onChange={(e) => onRadiusChange(Number(e.target.value))}
           />
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              fontSize: "11px",
-              color: "var(--text-tertiary)",
-              marginTop: "6px",
-            }}
-          >
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--text-tertiary)", marginTop: "6px" }}>
             <span>1 mi</span>
             <span>50 mi</span>
           </div>
@@ -404,44 +326,16 @@ export default function Sidebar({
 
         {/* Error */}
         {error && (
-          <div
-            style={{
-              margin: "12px 20px 0",
-              padding: "12px 14px",
-              background: "var(--red-soft)",
-              borderRadius: "var(--radius-sm)",
-              flexShrink: 0,
-            }}
-          >
-            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--red)", marginBottom: "2px" }}>
-              Connection Error
-            </div>
+          <div style={{ margin: "12px 20px 0", padding: "12px 14px", background: "var(--red-soft)", borderRadius: "var(--radius-sm)", flexShrink: 0 }}>
+            <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--red)", marginBottom: "2px" }}>Connection Error</div>
             <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5 }}>{error}</div>
           </div>
         )}
 
         {/* Loading */}
         {loading && (
-          <div
-            style={{
-              padding: "14px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              borderBottom: "1px solid var(--border)",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                width: "14px",
-                height: "14px",
-                border: "2px solid var(--bg-surface)",
-                borderTopColor: "var(--accent)",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-              }}
-            />
+          <div style={{ padding: "14px 20px", display: "flex", alignItems: "center", gap: "10px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+            <div style={{ width: "14px", height: "14px", border: "2px solid var(--bg-surface)", borderTopColor: "var(--accent)", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
             <span style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>Scanning area...</span>
           </div>
         )}
@@ -450,18 +344,13 @@ export default function Sidebar({
         <div style={{ flex: 1, overflowY: "auto", padding: "8px 12px" }}>
           {!loading && wells.length === 0 && !error && (
             <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-tertiary)" }}>
-              <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-                No wells found
-              </div>
-              <div style={{ fontSize: "13px", lineHeight: 1.5 }}>
-                Try panning the map or increasing the search radius.
-              </div>
+              <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>No wells found</div>
+              <div style={{ fontSize: "13px", lineHeight: 1.5 }}>Try panning the map or increasing the search radius.</div>
             </div>
           )}
 
           {sortedWells.map((well) => {
             const isSelected = well.api_number === selectedWellApi;
-            const age = getWellAge(well);
 
             return (
               <button
@@ -508,23 +397,15 @@ export default function Sidebar({
                       fontSize: "11px",
                       color: "var(--text-tertiary)",
                       marginTop: "2px",
-                      display: "flex",
-                      gap: "8px",
-                      flexWrap: "wrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
                     }}
                   >
-                    {well.well_name && <span>{well.well_name}</span>}
-                    {age !== null && (
-                      <span style={{ color: age >= 50 ? "var(--red)" : "var(--text-tertiary)" }}>
-                        {getWellYear(well)} ({age}yr)
-                      </span>
-                    )}
-                    {well.liability_est != null && (
-                      <span>{formatLiability(well.liability_est)}</span>
-                    )}
+                    {[well.operator_name, well.county].filter(Boolean).join(" \u00B7 ")}
                   </div>
                 </div>
-                <ProximityBadge well={well} colorMode={colorMode} />
+                <Badge well={well} colorMode={colorMode} />
               </button>
             );
           })}
@@ -541,9 +422,7 @@ export default function Sidebar({
             justifyContent: "space-between",
           }}
         >
-          <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-            Source: TX Railroad Commission
-          </span>
+          <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Source: TX Railroad Commission</span>
           <div style={{ display: "flex", gap: "12px" }}>
             {(colorMode === "proximity"
               ? [
@@ -552,9 +431,9 @@ export default function Sidebar({
                   { color: "var(--green)", label: "5+ mi" },
                 ]
               : [
-                  { color: "var(--red)", label: "50+ yr" },
-                  { color: "var(--amber)", label: "30-50" },
-                  { color: "var(--green)", label: "< 30" },
+                  { color: "var(--red)", label: "10+ yr" },
+                  { color: "var(--amber)", label: "5-10" },
+                  { color: "var(--green)", label: "< 5" },
                 ]
             ).map(({ color, label }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: "5px" }}>
