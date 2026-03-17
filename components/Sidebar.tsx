@@ -5,7 +5,6 @@ import {
   ColorMode,
   getWellColor,
   formatInactivity,
-  formatLiability,
 } from "@/utils/supabase";
 import AddressSearch from "@/components/AddressSearch";
 
@@ -97,7 +96,6 @@ export default function Sidebar({
 }: SidebarProps) {
   const closeWells = wells.filter((w) => w.miles_away <= 1);
   const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
-  const totalLiability = wells.reduce((sum, w) => sum + (w.liability_est || 0), 0);
 
   const sortedWells =
     colorMode === "inactivity"

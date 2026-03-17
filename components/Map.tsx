@@ -4,13 +4,15 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import {
-  Well,
   ColorMode,
   getWellColor,
   getInactivityRadius,
   fetchWellsNear,
   formatInactivity,
   formatLiability,
+  getInactivityRadius,
+  getWellColor,
+  supabase,
 } from "@/utils/supabase";
 
 interface MapProps {
