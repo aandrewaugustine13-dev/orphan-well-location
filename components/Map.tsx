@@ -99,6 +99,20 @@ function MapController({
   return null;
 }
 
+interface GroundwaterWell {
+  well_id: string;
+  latitude: number;
+  longitude: number;
+  state: string;
+  county: string;
+  well_depth_ft: number | null;
+  well_capacity_gpm: number | null;
+  water_use: string;
+  status: string;
+  year_constructed: number | null;
+  miles_away: number;
+}
+
 export default function Map({
   onWellsLoaded,
   onLoadingChange,
@@ -114,10 +128,13 @@ export default function Map({
   const [queryCenter, setQueryCenter] = useState<[number, number]>(DEFAULT_CENTER);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
   const [wells, setWells] = useState<Well[]>([]);
+  const [groundwaterWells, setGroundwaterWells] = useState<GroundwaterWell[]>([]);
+  const [showGroundwater, setShowGroundwater] = useState(false);
 
   const suppressNextMoveEndRef = useRef(false);
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
+  const gwRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
 
   const applyCenterUpdate = useCallback((next: [number, number], immediateFetch: boolean) => {
@@ -226,7 +243,33 @@ export default function Map({
     loadWells();
   }, [queryCenter, radiusMeters, onError, onLoadingChange, onWellsLoaded]);
 
+  useEffect(() => {
+    if (!showGroundwater) {
+      setGroundwaterWells([]);
+      return;
+    }
+
+    const requestId = ++gwRequestIdRef.current;
+
+    async function loadGroundwater() {
+      if (!supabase) return;
+
+      const { data, error } = await supabase.rpc("get_groundwater_wells_in_radius", {
+        user_lng: queryCenter[1],
+        user_lat: queryCenter[0],
+        radius_meters: radiusMeters,
+      });
+
+      if (requestId !== gwRequestIdRef.current) return;
+      if (error) { console.error("Error fetching groundwater wells:", error); return; }
+      setGroundwaterWells((data as GroundwaterWell[]) ?? []);
+    }
+
+    loadGroundwater();
+  }, [queryCenter, radiusMeters, showGroundwater]);
+
   return (
+    <div style={{ position: "relative", width: "100%", height: "100%" }}>
     <MapContainer
       center={DEFAULT_CENTER}
       zoom={DEFAULT_ZOOM}
@@ -276,6 +319,47 @@ export default function Map({
           </CircleMarker>
         );
       })}
+
+      {showGroundwater && groundwaterWells.map((well) => (
+        <CircleMarker
+          key={well.well_id}
+          center={[well.latitude, well.longitude]}
+          radius={4}
+          pathOptions={{
+            color: "#1d4ed8",
+            fillColor: "#3b82f6",
+            fillOpacity: 0.7,
+            weight: 1,
+          }}
+        >
+          <Popup>
+            <div style={{ minWidth: 200 }}>
+              <div style={{ fontWeight: 700, marginBottom: 6 }}>Domestic Water Well</div>
+              <div>ID: {well.well_id}</div>
+              <div>{well.county}, {well.state}</div>
+              {well.well_depth_ft != null && <div>Depth: {well.well_depth_ft} ft</div>}
+              {well.well_capacity_gpm != null && <div>Capacity: {well.well_capacity_gpm} GPM</div>}
+              <div>Status: {well.status}</div>
+              {well.year_constructed != null && <div>Constructed: {well.year_constructed}</div>}
+              <div>{well.miles_away.toFixed(2)} mi away</div>
+            </div>
+          </Popup>
+        </CircleMarker>
+      ))}
     </MapContainer>
+
+    <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000 }}>
+      <button
+        onClick={() => setShowGroundwater((v) => !v)}
+        className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
+          showGroundwater
+            ? "bg-blue-600 text-white hover:bg-blue-700"
+            : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+        }`}
+      >
+        {showGroundwater ? "Hide Groundwater Wells" : "Show Groundwater Wells"}
+      </button>
+    </div>
+    </div>
   );
 }
