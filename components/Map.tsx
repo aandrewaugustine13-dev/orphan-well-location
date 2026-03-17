@@ -21,8 +21,8 @@ import {
   formatLiability,
 } from "@/utils/supabase";
 
-const DEFAULT_CENTER_LAT = 33.5779;
-const DEFAULT_CENTER_LNG = -101.8552;
+const DEFAULT_CENTER_LAT = 39.8;
+const DEFAULT_CENTER_LNG = -98.5;
 
 interface MapProps {
   onWellsLoaded: (wells: Well[]) => void;
@@ -164,7 +164,7 @@ export default function Map({
   return (
     <MapContainer
       center={[DEFAULT_CENTER_LAT, DEFAULT_CENTER_LNG]}
-      zoom={10}
+      zoom={5}
       style={{ width: "100%", height: "100%" }}
       zoomControl={true}
     >
@@ -261,10 +261,12 @@ export default function Map({
                     </div>
                   )}
 
-                  {well.county && (
+                  {(well.county || well.state) && (
                     <div>
-                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>County</div>
-                      <div style={{ color: "#8b95a8" }}>{well.county}</div>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Location</div>
+                      <div style={{ color: "#8b95a8" }}>
+                        {[well.county, well.state].filter(Boolean).join(", ")}
+                      </div>
                     </div>
                   )}
 
