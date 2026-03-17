@@ -20,6 +20,7 @@ export interface Well {
   well_status?: string;
   well_type?: string;
   county?: string;
+  state?: string;
   field_name?: string;
   lease_name?: string;
   months_inactive?: number | null;
