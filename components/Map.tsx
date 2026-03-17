@@ -33,6 +33,7 @@ interface MapProps {
   selectedWellApi: string | null;
   onSelectWell: (api: string | null) => void;
   colorMode: ColorMode;
+  searchLocation: { lat: number; lng: number } | null;
 }
 
 function MapEventHandler({
@@ -140,6 +141,27 @@ function FlyToWell({
   return null;
 }
 
+function FlyToSearch({
+  location,
+}: {
+  location: { lat: number; lng: number } | null;
+}) {
+  const map = useMap();
+  const lastLocation = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (location) {
+      const key = `${location.lat},${location.lng}`;
+      if (key !== lastLocation.current) {
+        lastLocation.current = key;
+        map.flyTo([location.lat, location.lng], 12, { duration: 1 });
+      }
+    }
+  }, [location, map]);
+
+  return null;
+}
+
 export default function Map({
   onWellsLoaded,
   onLoadingChange,
@@ -149,6 +171,7 @@ export default function Map({
   selectedWellApi,
   onSelectWell,
   colorMode,
+  searchLocation,
 }: MapProps) {
   const [wells, setWells] = useState<Well[]>([]);
   const skipFetchRef = useRef(false);
@@ -177,6 +200,7 @@ export default function Map({
         skipFetchRef={skipFetchRef}
       />
       <FlyToWell apiNumber={selectedWellApi} wells={wells} skipFetchRef={skipFetchRef} />
+      <FlyToSearch location={searchLocation} />
 
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
