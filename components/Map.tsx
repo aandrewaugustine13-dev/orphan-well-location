@@ -15,11 +15,10 @@ import {
   Well,
   ColorMode,
   getWellColor,
-  getWellAge,
-  getWellYear,
-  formatLiability,
   getProximityColor,
-  getAgeRadius,
+  getInactivityRadius,
+  formatInactivity,
+  formatLiability,
 } from "@/utils/supabase";
 
 const DEFAULT_CENTER_LAT = 33.5779;
@@ -162,12 +161,11 @@ export default function Map({
       {wells.map((well) => {
         const isSelected = well.api_number === selectedWellApi;
         const color = getWellColor(well, colorMode);
-        const age = getWellAge(well);
         const proximityColor = getProximityColor(well.miles_away);
 
         const radius =
-          colorMode === "age"
-            ? getAgeRadius(well, isSelected)
+          colorMode === "inactivity"
+            ? getInactivityRadius(well, isSelected)
             : isSelected
             ? 10
             : well.miles_away <= 1
@@ -190,28 +188,25 @@ export default function Map({
             }}
           >
             <Popup>
-              <div style={{ minWidth: "180px" }}>
-                {/* API Number */}
+              <div style={{ minWidth: "200px" }}>
                 <div
                   style={{
                     fontFamily: "'IBM Plex Mono', monospace",
                     fontSize: "14px",
                     fontWeight: 500,
                     color: "#f0f2f5",
-                    marginBottom: "4px",
+                    marginBottom: "2px",
                   }}
                 >
                   {well.api_number}
                 </div>
 
-                {/* Well name */}
                 {well.well_name && (
                   <div style={{ fontSize: "12px", color: "#8b95a8", marginBottom: "8px" }}>
                     {well.well_name}
                   </div>
                 )}
 
-                {/* Info grid */}
                 <div
                   style={{
                     display: "grid",
@@ -228,14 +223,32 @@ export default function Map({
                   </div>
 
                   <div>
-                    <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Drilled</div>
+                    <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Inactive</div>
                     <div style={{ color: "#f0f2f5", fontWeight: 500 }}>
-                      {getWellYear(well)}
-                      {age !== null && (
-                        <span style={{ color: "#8b95a8", fontWeight: 400 }}> ({age}yr)</span>
-                      )}
+                      {formatInactivity(well)}
                     </div>
                   </div>
+
+                  {well.operator_name && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Operator</div>
+                      <div style={{ color: "#8b95a8" }}>{well.operator_name}</div>
+                    </div>
+                  )}
+
+                  {well.county && (
+                    <div>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>County</div>
+                      <div style={{ color: "#8b95a8" }}>{well.county}</div>
+                    </div>
+                  )}
+
+                  {well.field_name && (
+                    <div>
+                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Field</div>
+                      <div style={{ color: "#8b95a8" }}>{well.field_name}</div>
+                    </div>
+                  )}
 
                   {well.liability_est != null && (
                     <div>
@@ -243,13 +256,6 @@ export default function Map({
                       <div style={{ color: "#f0f2f5", fontWeight: 500 }}>
                         {formatLiability(well.liability_est)}
                       </div>
-                    </div>
-                  )}
-
-                  {well.operator_name && (
-                    <div>
-                      <div style={{ color: "#505c72", fontSize: "10px", marginBottom: "1px" }}>Operator</div>
-                      <div style={{ color: "#8b95a8" }}>{well.operator_name}</div>
                     </div>
                   )}
                 </div>
