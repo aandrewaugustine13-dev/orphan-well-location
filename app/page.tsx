@@ -21,27 +21,15 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [colorMode, setColorMode] = useState<ColorMode>("proximity");
 
-  const handleWellsLoaded = useCallback((data: Well[]) => {
-    setWells(data);
-  }, []);
-
-  const handleLoadingChange = useCallback((state: boolean) => {
-    setLoading(state);
-  }, []);
-
-  const handleCenterChange = useCallback((lat: number, lng: number) => {
-    setCenter({ lat, lng });
-  }, []);
-
-  const handleError = useCallback((err: string | null) => {
-    setError(err);
-  }, []);
+  const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
+  const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
+  const handleCenterChange = useCallback((lat: number, lng: number) => setCenter({ lat, lng }), []);
+  const handleError = useCallback((err: string | null) => setError(err), []);
 
   return (
     <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
       {showLanding && <LandingOverlay onEnter={() => setShowLanding(false)} />}
 
-      {/* Top bar */}
       <div
         style={{
           position: "absolute",
@@ -96,19 +84,12 @@ export default function Home() {
               {loading ? "Scanning..." : `${wells.length} wells`}
             </span>
           </div>
-          <span
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: "11px",
-              color: "var(--text-tertiary)",
-            }}
-          >
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-tertiary)" }}>
             {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
           </span>
         </div>
       </div>
 
-      {/* Map */}
       <div
         style={{
           position: "absolute",
@@ -132,7 +113,6 @@ export default function Home() {
         />
       </div>
 
-      {/* Sidebar */}
       {!showLanding && (
         <div style={{ position: "absolute", top: "40px", left: 0, bottom: 0, zIndex: 1000 }}>
           <Sidebar
