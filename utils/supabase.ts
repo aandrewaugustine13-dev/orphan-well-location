@@ -77,3 +77,18 @@ export function getInactivityRadius(well: Well, isSelected: boolean): number {
   if (months >= 60) return 6;
   return 5;
 }
+
+export async function fetchWellsNear(
+  lat: number,
+  lng: number,
+  radiusMeters: number
+): Promise<Well[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("wells_near", {
+    ref_lat: lat,
+    ref_lng: lng,
+    radius_m: radiusMeters,
+  });
+  if (error) throw new Error(error.message);
+  return (data as Well[]) ?? [];
+}
