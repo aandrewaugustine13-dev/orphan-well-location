@@ -5,8 +5,8 @@ import {
   ColorMode,
   getWellColor,
   formatInactivity,
-  formatLiability,
 } from "@/utils/supabase";
+import AddressSearch from "@/components/AddressSearch";
 
 interface SidebarProps {
   wells: Well[];
@@ -21,6 +21,7 @@ interface SidebarProps {
   center: { lat: number; lng: number };
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
+  onSearchLocation: (lat: number, lng: number) => void;
 }
 
 function Badge({ well, colorMode }: { well: Well; colorMode: ColorMode }) {
@@ -91,10 +92,10 @@ export default function Sidebar({
   center,
   colorMode,
   onColorModeChange,
+  onSearchLocation,
 }: SidebarProps) {
   const closeWells = wells.filter((w) => w.miles_away <= 1);
   const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
-  const totalLiability = wells.reduce((sum, w) => sum + (w.liability_est || 0), 0);
 
   const sortedWells =
     colorMode === "inactivity"
@@ -213,6 +214,11 @@ export default function Sidebar({
               </svg>
             </button>
           </div>
+        </div>
+
+        {/* Search */}
+        <div style={{ padding: "12px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+          <AddressSearch onSelect={(lat, lng) => onSearchLocation(lat, lng)} />
         </div>
 
         {/* Color toggle */}
