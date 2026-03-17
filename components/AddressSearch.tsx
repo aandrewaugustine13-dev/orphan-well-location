@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface SearchResult {
   display_name: string;
@@ -8,81 +8,161 @@ interface SearchResult {
   lon: string;
 }
 
+interface NormalizedResult {
+  label: string;
+  lat: number;
+  lng: number;
+}
+
 interface AddressSearchProps {
   onSelect: (lat: number, lng: number, label: string) => void;
 }
 
+const ZIP_REGEX = /^\d{5}$/;
+
 export default function AddressSearch({ onSelect }: AddressSearchProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<NormalizedResult[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const requestIdRef = useRef(0);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setShowResults(false);
       }
     }
+
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  function search(q: string) {
-    if (q.length < 3) {
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, []);
+
+  function normalizeLabel(value: string) {
+    const parts = value.split(",").map((s) => s.trim());
+    return parts.slice(0, 3).join(", ");
+  }
+
+  async function fetchJson(url: string): Promise<SearchResult[]> {
+    const response = await fetch(url, {
+      headers: {
+        "Accept-Language": "en",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Geocoding failed with status ${response.status}`);
+    }
+
+    return response.json();
+  }
+
+  async function search(q: string) {
+    const trimmed = q.trim();
+    const requestId = ++requestIdRef.current;
+
+    if (trimmed.length < 3) {
       setResults([]);
+      setError(null);
       setShowResults(false);
+      setLoading(false);
       return;
     }
 
     setLoading(true);
-    fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(q)}`,
-      {
-        headers: { "Accept-Language": "en" },
+    setError(null);
+
+    try {
+      let data: SearchResult[] = [];
+
+      if (ZIP_REGEX.test(trimmed)) {
+        data = await fetchJson(
+          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&postalcode=${trimmed}&limit=5`
+        );
+
+        if (!data.length) {
+          data = await fetchJson(
+            `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(
+              `${trimmed}, United States`
+            )}`
+          );
+        }
+      } else {
+        data = await fetchJson(
+          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(
+            trimmed
+          )}`
+        );
       }
-    )
-      .then((res) => res.json())
-      .then((data: SearchResult[]) => {
-        setResults(data);
-        setShowResults(data.length > 0);
-      })
-      .catch(() => {
-        setResults([]);
-      })
-      .finally(() => {
+
+      if (requestId !== requestIdRef.current) return;
+
+      const normalized = data
+        .map((item) => ({
+          lat: Number(item.lat),
+          lng: Number(item.lon),
+          label: normalizeLabel(item.display_name),
+        }))
+        .filter((item) => Number.isFinite(item.lat) && Number.isFinite(item.lng));
+
+      setResults(normalized);
+      setShowResults(normalized.length > 0);
+
+      if (normalized.length === 0) {
+        setError("No results found. Try a full street address or valid US ZIP code.");
+      }
+    } catch {
+      if (requestId !== requestIdRef.current) return;
+      setResults([]);
+      setShowResults(false);
+      setError("Could not geocode this location right now. Please try again.");
+    } finally {
+      if (requestId === requestIdRef.current) {
         setLoading(false);
-      });
+      }
+    }
   }
 
   function handleInput(value: string) {
     setQuery(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(value), 400);
-  }
+    setError(null);
 
-  function handleSelect(result: SearchResult) {
-    const lat = parseFloat(result.lat);
-    const lng = parseFloat(result.lon);
-
-    // Shorten display name - take first 2-3 parts
-    const parts = result.display_name.split(",").map((s) => s.trim());
-    const short = parts.slice(0, 3).join(", ");
-
-    setQuery(short);
-    setShowResults(false);
-    setResults([]);
-    onSelect(lat, lng, short);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === "Enter" && results.length > 0) {
-      e.preventDefault();
-      handleSelect(results[0]);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
     }
+
+    debounceRef.current = setTimeout(() => search(value), 350);
+  }
+
+  function handleSelect(result: NormalizedResult) {
+    setQuery(result.label);
+    setResults([]);
+    setShowResults(false);
+    setError(null);
+    onSelect(result.lat, result.lng, result.label);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      if (results.length > 0) {
+        e.preventDefault();
+        handleSelect(results[0]);
+      }
+      return;
+    }
+
     if (e.key === "Escape") {
       setShowResults(false);
     }
@@ -101,7 +181,6 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
           gap: "8px",
         }}
       >
-        {/* Search icon */}
         <svg
           width="14"
           height="14"
@@ -120,9 +199,13 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
           type="text"
           value={query}
           onChange={(e) => handleInput(e.target.value)}
-          onFocus={() => results.length > 0 && setShowResults(true)}
+          onFocus={() => {
+            if (results.length > 0) {
+              setShowResults(true);
+            }
+          }}
           onKeyDown={handleKeyDown}
-          placeholder="Search address or zip code..."
+          placeholder="Search address or ZIP code..."
           style={{
             flex: 1,
             background: "transparent",
@@ -135,7 +218,6 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
           }}
         />
 
-        {/* Loading spinner or clear button */}
         {loading ? (
           <div
             style={{
@@ -154,6 +236,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
               setQuery("");
               setResults([]);
               setShowResults(false);
+              setError(null);
             }}
             style={{
               background: "none",
@@ -165,6 +248,7 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
               alignItems: "center",
               flexShrink: 0,
             }}
+            aria-label="Clear search"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M18 6L6 18M6 6l12 12" />
@@ -173,7 +257,18 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         ) : null}
       </div>
 
-      {/* Results dropdown */}
+      {error && (
+        <div
+          style={{
+            marginTop: "6px",
+            fontSize: "11px",
+            color: "var(--red)",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
       {showResults && (
         <div
           style={{
@@ -190,15 +285,15 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
             overflow: "hidden",
           }}
         >
-          {results.map((r, i) => {
-            const parts = r.display_name.split(",").map((s) => s.trim());
+          {results.map((result, i) => {
+            const parts = result.label.split(",").map((s) => s.trim());
             const main = parts.slice(0, 2).join(", ");
-            const sub = parts.slice(2, 4).join(", ");
+            const sub = parts.slice(2).join(", ");
 
             return (
               <button
-                key={i}
-                onClick={() => handleSelect(r)}
+                key={`${result.lat}-${result.lng}-${i}`}
+                onClick={() => handleSelect(result)}
                 style={{
                   display: "block",
                   width: "100%",
