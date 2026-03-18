@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import LandingOverlay from "@/components/LandingOverlay";
+import NLSearchBar, { NLResult } from "@/components/NLSearchBar";
 import { Well, ColorMode } from "@/utils/supabase";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
@@ -21,6 +22,7 @@ export default function Home() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [colorMode, setColorMode] = useState<ColorMode>("proximity");
   const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nlSummary, setNlSummary] = useState<string | null>(null);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
@@ -28,6 +30,11 @@ export default function Home() {
   const handleError = useCallback((err: string | null) => setError(err), []);
   const handleSearchLocation = useCallback((lat: number, lng: number) => {
     setSearchLocation({ lat, lng });
+  }, []);
+  const handleNLResult = useCallback((result: NLResult) => {
+    setSearchLocation({ lat: result.center.lat, lng: result.center.lng });
+    setRadiusMiles(result.radiusMiles);
+    setNlSummary(result.summary);
   }, []);
 
   return (
@@ -116,6 +123,69 @@ export default function Home() {
           colorMode={colorMode}
           searchLocation={searchLocation}
         />
+
+        {!showLanding && (
+          <NLSearchBar
+            onResult={handleNLResult}
+            onError={() => {}}
+          />
+        )}
+
+        {!showLanding && nlSummary && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "32px",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "min(520px, calc(100vw - 48px))",
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-strong)",
+              borderRadius: "var(--radius-sm)",
+              padding: "12px 16px",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              zIndex: 800,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "10px",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="var(--accent)"
+              strokeWidth="2"
+              strokeLinecap="round"
+              style={{ flexShrink: 0, marginTop: "1px" }}
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+            <span style={{ fontSize: "13px", color: "var(--text-primary)", flex: 1, lineHeight: 1.5 }}>
+              {nlSummary}
+            </span>
+            <button
+              onClick={() => setNlSummary(null)}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--text-tertiary)",
+                cursor: "pointer",
+                padding: "0",
+                display: "flex",
+                alignItems: "center",
+                flexShrink: 0,
+              }}
+              aria-label="Dismiss"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M18 6L6 18M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {!showLanding && (
