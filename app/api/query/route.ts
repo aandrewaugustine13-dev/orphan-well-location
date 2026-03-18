@@ -1,13 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+let _anthropic: Anthropic | null = null;
+function getAnthropic(): Anthropic {
+  if (!_anthropic) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      throw new Error("ANTHROPIC_API_KEY environment variable is not configured");
+    }
+    _anthropic = new Anthropic({ apiKey });
+  }
+  return _anthropic;
+}
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!
-);
+// SupabaseClient<any, any, any, any>: explicit type args are required to avoid a TypeScript
+// issue where ReturnType<typeof createClient> leaves conditional type defaults unevaluated,
+// causing the rpc() args parameter to be incorrectly resolved as `undefined`.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: SupabaseClient<any, any, any, any> | null = null;
+function getSupabase(): SupabaseClient<any, any, any, any> {
+  if (!_supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
+    if (!url || !key) {
+      throw new Error("Supabase environment variables are not configured");
+    }
+    _supabase = createClient(url, key);
+  }
+  return _supabase;
+}
 
 const MILES_TO_METERS = 1609.34;
 
@@ -78,7 +100,7 @@ export async function POST(req: NextRequest) {
   // Step 1: Parse with Claude
   let parsed: ParsedQuery;
   try {
-    const msg = await anthropic.messages.create({
+    const msg = await getAnthropic().messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 256,
       system: SYSTEM_PROMPT,
@@ -124,7 +146,7 @@ export async function POST(req: NextRequest) {
   let groundwaterWells: WellRow[] = [];
 
   try {
-    const { data: orphanData, error: orphanErr } = await supabase.rpc("get_wells_in_radius", {
+    const { data: orphanData, error: orphanErr } = await getSupabase().rpc("get_wells_in_radius", {
       user_lng: center.lng,
       user_lat: center.lat,
       radius_meters: radiusMeters,
@@ -133,7 +155,7 @@ export async function POST(req: NextRequest) {
     orphanWells = orphanData ?? [];
 
     if (needsGroundwater) {
-      const { data: gwData, error: gwErr } = await supabase.rpc("get_groundwater_wells_in_radius", {
+      const { data: gwData, error: gwErr } = await getSupabase().rpc("get_groundwater_wells_in_radius", {
         user_lng: center.lng,
         user_lat: center.lat,
         radius_meters: radiusMeters,
