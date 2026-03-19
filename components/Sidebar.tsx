@@ -29,7 +29,9 @@ function Badge({ well, colorMode }: { well: Well; colorMode: ColorMode }) {
   const label =
     colorMode === "inactivity"
       ? formatInactivity(well)
-      : `${well.miles_away.toFixed(1)} mi`;
+      : well.miles_away != null
+      ? `${well.miles_away.toFixed(1)} mi`
+      : "—";
 
   return (
     <span
@@ -94,15 +96,15 @@ export default function Sidebar({
   onColorModeChange,
   onSearchLocation,
 }: SidebarProps) {
-  const closeWells = wells.filter((w) => w.miles_away <= 1);
+  const closeWells = wells.filter((w) => w.miles_away != null && w.miles_away <= 1);
   const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
 
   const sortedWells =
     colorMode === "inactivity"
       ? [...wells].sort((a, b) => (b.months_inactive || 0) - (a.months_inactive || 0))
-      : [...wells].sort((a, b) => a.miles_away - b.miles_away);
+      : [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity));
 
-  const closestWell = [...wells].sort((a, b) => a.miles_away - b.miles_away)[0];
+  const closestWell = [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity))[0];
   const longestInactive = [...wells].sort(
     (a, b) => (b.months_inactive || 0) - (a.months_inactive || 0)
   )[0];
@@ -255,12 +257,12 @@ export default function Sidebar({
                 color: closeWells.length > 0 ? "var(--red)" : "var(--text-tertiary)",
               },
               {
-                value: loading || !closestWell ? "\u2014" : `${closestWell.miles_away.toFixed(1)}`,
+                value: loading || !closestWell || closestWell.miles_away == null ? "\u2014" : `${closestWell.miles_away.toFixed(1)}`,
                 label: "Nearest (mi)",
                 color:
-                  closestWell && closestWell.miles_away <= 1
+                  closestWell && closestWell.miles_away != null && closestWell.miles_away <= 1
                     ? "var(--red)"
-                    : closestWell && closestWell.miles_away <= 5
+                    : closestWell && closestWell.miles_away != null && closestWell.miles_away <= 5
                     ? "var(--amber)"
                     : "var(--green)",
               },

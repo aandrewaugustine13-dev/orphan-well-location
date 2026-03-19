@@ -5,51 +5,88 @@ import { MapContainer, TileLayer, CircleMarker, Popup, useMapEvents, useMap } fr
 import "leaflet/dist/leaflet.css";
 import {
   ColorMode,
+  Well,
   getWellColor,
   getInactivityRadius,
-  fetchWellsNear,
   formatInactivity,
   formatLiability,
-  getInactivityRadius,
-  getWellColor,
   supabase,
 } from "@/utils/supabase";
+
+interface MapBounds {
+  south: number;
+  north: number;
+  west: number;
+  east: number;
+}
 
 interface MapProps {
   onWellsLoaded: (wells: Well[]) => void;
   onLoadingChange: (loading: boolean) => void;
   onCenterChange: (lat: number, lng: number) => void;
   onError: (err: string | null) => void;
-  radiusMeters: number;
   selectedWellApi: string | null;
   onSelectWell: (api: string | null) => void;
   colorMode: ColorMode;
-  searchLocation: { lat: number; lng: number } | null;
+  searchLocation: { lat: number; lng: number; zoom?: number } | null;
+  searchedLocation: { lat: number; lng: number } | null;
+}
+
+function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 3958.8;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function MapEvents({
-  radiusMeters,
   onWellsLoaded,
   onLoadingChange,
   onCenterChange,
   onError,
+  searchedLocation,
 }: {
-  radiusMeters: number;
   onWellsLoaded: (wells: Well[]) => void;
   onLoadingChange: (loading: boolean) => void;
   onCenterChange: (lat: number, lng: number) => void;
   onError: (err: string | null) => void;
+  searchedLocation: { lat: number; lng: number } | null;
 }) {
-  const radiusRef = useRef(radiusMeters);
-  radiusRef.current = radiusMeters;
+  const searchedLocationRef = useRef(searchedLocation);
+  searchedLocationRef.current = searchedLocation;
 
   const load = useCallback(
-    async (lat: number, lng: number) => {
+    async (bounds: MapBounds, center: { lat: number; lng: number }) => {
       onLoadingChange(true);
       onError(null);
+      if (!supabase) {
+        onError("Supabase environment variables are missing.");
+        onWellsLoaded([]);
+        onLoadingChange(false);
+        return;
+      }
       try {
-        const wells = await fetchWellsNear(lat, lng, radiusRef.current);
-        onWellsLoaded(wells);
+        const { data, error } = await supabase
+          .from("wells")
+          .select("*")
+          .gte("latitude", bounds.south)
+          .lte("latitude", bounds.north)
+          .gte("longitude", bounds.west)
+          .lte("longitude", bounds.east)
+          .limit(5000);
+        if (error) throw new Error(error.message);
+        const rawWells = (data as Well[]) ?? [];
+        const loc = searchedLocationRef.current;
+        const enriched = rawWells.map((w) => ({
+          ...w,
+          miles_away: loc
+            ? haversineMiles(loc.lat, loc.lng, w.latitude, w.longitude)
+            : undefined,
+        }));
+        onWellsLoaded(enriched);
       } catch (err) {
         onError(err instanceof Error ? err.message : "Failed to load wells");
         onWellsLoaded([]);
@@ -63,24 +100,26 @@ function MapEvents({
   const map = useMapEvents({
     moveend: () => {
       const c = map.getCenter();
+      const b = map.getBounds();
       onCenterChange(c.lat, c.lng);
-      load(c.lat, c.lng);
+      load(
+        { south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast() },
+        { lat: c.lat, lng: c.lng }
+      );
     },
   });
 
   // Initial load on mount
   useEffect(() => {
     const c = map.getCenter();
+    const b = map.getBounds();
     onCenterChange(c.lat, c.lng);
-    load(c.lat, c.lng);
+    load(
+      { south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast() },
+      { lat: c.lat, lng: c.lng }
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Reload when radius changes
-  useEffect(() => {
-    const c = map.getCenter();
-    load(c.lat, c.lng);
-  }, [radiusMeters, load, map]);
 
   return null;
 }
@@ -88,12 +127,12 @@ function MapEvents({
 function FlyToLocation({
   searchLocation,
 }: {
-  searchLocation: { lat: number; lng: number } | null;
+  searchLocation: { lat: number; lng: number; zoom?: number } | null;
 }) {
   const map = useMap();
   useEffect(() => {
     if (searchLocation) {
-      map.flyTo([searchLocation.lat, searchLocation.lng], 12, { duration: 1.5 });
+      map.flyTo([searchLocation.lat, searchLocation.lng], searchLocation.zoom ?? 12, { duration: 1.5 });
     }
   }, [searchLocation, map]);
   return null;
@@ -104,11 +143,11 @@ export default function Map({
   onLoadingChange,
   onCenterChange,
   onError,
-  radiusMeters,
   selectedWellApi,
   onSelectWell,
   colorMode,
   searchLocation,
+  searchedLocation,
 }: MapProps) {
   const [wells, setWells] = useState<Well[]>([]);
 
@@ -132,11 +171,11 @@ export default function Map({
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
       <MapEvents
-        radiusMeters={radiusMeters}
         onWellsLoaded={handleWellsLoaded}
         onLoadingChange={onLoadingChange}
         onCenterChange={onCenterChange}
         onError={onError}
+        searchedLocation={searchedLocation}
       />
       <FlyToLocation searchLocation={searchLocation} />
       {wells.map((well) => {
@@ -176,9 +215,11 @@ export default function Map({
                       {[well.county, well.state].filter(Boolean).join(", ")}
                     </div>
                   )}
-                  <div style={{ fontSize: "12px" }}>
-                    <strong>Distance:</strong> {well.miles_away.toFixed(1)} mi
-                  </div>
+                  {well.miles_away != null && (
+                    <div style={{ fontSize: "12px" }}>
+                      <strong>Distance:</strong> {well.miles_away.toFixed(1)} mi
+                    </div>
+                  )}
                   {well.months_inactive != null && (
                     <div style={{ fontSize: "12px" }}>
                       <strong>Inactive:</strong> {formatInactivity(well)}
@@ -198,3 +239,4 @@ export default function Map({
     </MapContainer>
   );
 }
+
