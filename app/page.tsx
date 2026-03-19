@@ -110,11 +110,11 @@ export default function Home() {
           onLoadingChange={handleLoadingChange}
           onCenterChange={handleCenterChange}
           onError={handleError}
-          radiusMeters={Math.round(radiusMiles * MILES_TO_METERS)}
           selectedWellApi={selectedWellApi}
           onSelectWell={setSelectedWellApi}
           colorMode={colorMode}
           searchLocation={searchLocation}
+          searchedLocation={searchLocation}
         />
       </div>
 
