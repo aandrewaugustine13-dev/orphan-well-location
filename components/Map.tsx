@@ -207,7 +207,7 @@ export default function Map({
       }
 
       const { data, error } = await supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("*")
         .gte("latitude", bounds.minLat)
         .lte("latitude", bounds.maxLat)

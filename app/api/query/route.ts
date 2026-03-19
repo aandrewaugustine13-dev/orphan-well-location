@@ -1,37 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-let _anthropic: Anthropic | null = null;
-
-function getAnthropic(): Anthropic {
-  if (!_anthropic) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY environment variable is not configured on the server.");
-    }
-    _anthropic = new Anthropic({ apiKey });
-  }
-  return _anthropic;
-}
-
-let _supabase: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key =
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY;
-    if (!url || !key) {
-      throw new Error(
-        "Missing required Supabase environment variables: NEXT_PUBLIC_SUPABASE_URL and either NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY"
-      );
-    }
-    _supabase = createClient(url, key);
-  }
-  return _supabase;
-}
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MILES_TO_METERS = 1609.34;
 
@@ -87,6 +58,11 @@ function haversineDistanceMiles(lat1: number, lng1: number, lat2: number, lng2: 
 }
 
 export async function POST(req: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
   let body: { query?: string };
   try {
     body = await req.json();
@@ -102,7 +78,6 @@ export async function POST(req: NextRequest) {
   // Step 1: Parse with Claude
   let parsed: ParsedQuery;
   try {
-    const anthropic = getAnthropic();
     const msg = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 256,
@@ -149,7 +124,6 @@ export async function POST(req: NextRequest) {
   let groundwaterWells: WellRow[] = [];
 
   try {
-    const supabase = getSupabase();
     const { data: orphanData, error: orphanErr } = await supabase.rpc("get_wells_in_radius", {
       user_lng: center.lng,
       user_lat: center.lat,
