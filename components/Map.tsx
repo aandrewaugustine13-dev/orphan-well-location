@@ -37,6 +37,7 @@ interface MapProps {
   colorMode: ColorMode;
   searchLocation: { lat: number; lng: number; zoom?: number } | null;
   searchedLocation: { lat: number; lng: number } | null;
+  searchedLabel: string | null;
 }
 
 interface ProgrammaticMove {
@@ -128,6 +129,7 @@ export default function Map({
   colorMode,
   searchLocation,
   searchedLocation,
+  searchedLabel,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
@@ -324,8 +326,8 @@ export default function Map({
                     {well.well_name || well.api_number}
                   </div>
                   <div>API: {well.api_number}</div>
-                  {well.miles_away != null && (
-                    <div>{well.miles_away.toFixed(2)} mi from search point</div>
+                  {well.miles_away != null && searchedLabel && (
+                    <div>{well.miles_away.toFixed(2)} mi from {searchedLabel}</div>
                   )}
                   <div>Inactive: {formatInactivity(well)}</div>
                   <div>Liability: {formatLiability(well.liability_est)}</div>
@@ -363,8 +365,8 @@ export default function Map({
                   {well.year_constructed != null && (
                     <div>Constructed: {well.year_constructed}</div>
                   )}
-                  {well.miles_away != null && (
-                    <div>{well.miles_away.toFixed(2)} mi from search point</div>
+                  {well.miles_away != null && searchedLabel && (
+                    <div>{well.miles_away.toFixed(2)} mi from {searchedLabel}</div>
                   )}
                 </div>
               </Popup>

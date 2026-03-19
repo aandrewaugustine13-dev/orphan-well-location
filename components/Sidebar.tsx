@@ -19,8 +19,9 @@ interface SidebarProps {
   center: { lat: number; lng: number };
   colorMode: ColorMode;
   onColorModeChange: (mode: ColorMode) => void;
-  onSearchLocation: (lat: number, lng: number) => void;
+  onSearchLocation: (lat: number, lng: number, label: string) => void;
   searchedLocation: { lat: number; lng: number } | null;
+  searchedLabel: string | null;
 }
 
 const LABEL_STYLE = {
@@ -43,21 +44,14 @@ export default function Sidebar({
   onColorModeChange,
   onSearchLocation,
   searchedLocation,
+  searchedLabel,
 }: SidebarProps) {
-  const closeWells = searchedLocation
-    ? wells.filter((w) => (w.miles_away ?? Infinity) <= 1)
-    : [];
-
   const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
 
   const sortedWells =
     colorMode === "inactivity" || !searchedLocation
       ? [...wells].sort((a, b) => (b.months_inactive || 0) - (a.months_inactive || 0))
       : [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity));
-
-  const closestWell = searchedLocation
-    ? [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity))[0]
-    : undefined;
 
   const longestInactive = [...wells].sort(
     (a, b) => (b.months_inactive || 0) - (a.months_inactive || 0)
@@ -68,26 +62,6 @@ export default function Sidebar({
       label: "IN VIEW",
       value: loading ? "—" : String(wells.length),
       color: "#e0e0e0",
-    },
-    {
-      label: "WITHIN 1 MI",
-      value: loading ? "—" : searchedLocation ? String(closeWells.length) : "—",
-      color: closeWells.length > 0 && searchedLocation ? "#e5484d" : "#555",
-    },
-    {
-      label: "NEAREST MI",
-      value:
-        loading || !closestWell || !searchedLocation || closestWell.miles_away == null
-          ? "—"
-          : closestWell.miles_away.toFixed(1),
-      color:
-        closestWell && closestWell.miles_away != null && searchedLocation
-          ? closestWell.miles_away <= 1
-            ? "#e5484d"
-            : closestWell.miles_away <= 5
-            ? "#d4a017"
-            : "#30a46c"
-          : "#555",
     },
     {
       label: "10+ YR INACTIVE",
@@ -101,6 +75,40 @@ export default function Sidebar({
         longestInactive && (longestInactive.months_inactive || 0) >= 120 ? "#e5484d" : "#d4a017",
     },
   ];
+
+  // Distance stats only shown when a real address has been searched
+  const closestWell = searchedLocation
+    ? [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity))[0]
+    : undefined;
+
+  const closeWells = searchedLocation
+    ? wells.filter((w) => (w.miles_away ?? Infinity) <= 1)
+    : [];
+
+  if (searchedLocation) {
+    stats.push(
+      {
+        label: "WITHIN 1 MI",
+        value: loading ? "—" : String(closeWells.length),
+        color: closeWells.length > 0 ? "#e5484d" : "#555",
+      },
+      {
+        label: "NEAREST MI",
+        value:
+          loading || !closestWell || closestWell.miles_away == null
+            ? "—"
+            : closestWell.miles_away.toFixed(1),
+        color:
+          closestWell?.miles_away != null
+            ? closestWell.miles_away <= 1
+              ? "#e5484d"
+              : closestWell.miles_away <= 5
+              ? "#d4a017"
+              : "#30a46c"
+            : "#555",
+      }
+    );
+  }
 
   return (
     <>
@@ -189,39 +197,50 @@ export default function Sidebar({
 
         {/* ── Address search ── */}
         <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
-          <AddressSearch onSelect={(lat, lng) => onSearchLocation(lat, lng)} />
+          <AddressSearch onSelect={(lat, lng, label) => onSearchLocation(lat, lng, label)} />
         </div>
 
-        {/* ── Color mode ── */}
+        {/* ── Color mode — only show proximity when address is set ── */}
         <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
           <div style={{ ...LABEL_STYLE, marginBottom: "7px" }}>COLOR BY</div>
           <div style={{ display: "flex", gap: "6px" }}>
-            {(["inactivity", "proximity"] as ColorMode[]).map((mode) => (
+            <button
+              onClick={() => onColorModeChange("inactivity")}
+              style={{
+                flex: 1,
+                padding: "5px 0",
+                fontSize: "9px",
+                fontWeight: 500,
+                letterSpacing: "0.12em",
+                color: colorMode === "inactivity" ? "#e0e0e0" : "#444",
+                background: "none",
+                border: colorMode === "inactivity" ? "1px solid #666" : "1px solid #222",
+                cursor: "pointer",
+                fontFamily: "var(--font-mono)",
+              }}
+            >
+              INACTIVITY
+            </button>
+            {searchedLocation && (
               <button
-                key={mode}
-                onClick={() => onColorModeChange(mode)}
+                onClick={() => onColorModeChange("proximity")}
                 style={{
                   flex: 1,
                   padding: "5px 0",
                   fontSize: "9px",
                   fontWeight: 500,
                   letterSpacing: "0.12em",
-                  color: colorMode === mode ? "#e0e0e0" : "#444",
+                  color: colorMode === "proximity" ? "#e0e0e0" : "#444",
                   background: "none",
-                  border: colorMode === mode ? "1px solid #666" : "1px solid #222",
+                  border: colorMode === "proximity" ? "1px solid #666" : "1px solid #222",
                   cursor: "pointer",
                   fontFamily: "var(--font-mono)",
                 }}
               >
-                {mode.toUpperCase()}
+                PROXIMITY
               </button>
-            ))}
+            )}
           </div>
-          {colorMode === "proximity" && !searchedLocation && (
-            <div style={{ fontSize: "9px", color: "#444", marginTop: "6px", letterSpacing: "0.04em" }}>
-              search an address to enable proximity coloring
-            </div>
-          )}
         </div>
 
         {/* ── Statistics ── */}
@@ -252,6 +271,11 @@ export default function Sidebar({
               </span>
             </div>
           ))}
+          {searchedLocation && searchedLabel && (
+            <div style={{ fontSize: "9px", color: "#333", marginTop: "6px", letterSpacing: "0.04em" }}>
+              from {searchedLabel}
+            </div>
+          )}
         </div>
 
         {/* ── Error ── */}
@@ -407,7 +431,7 @@ export default function Sidebar({
             USGS / STATE AGENCIES
           </span>
           <div style={{ display: "flex", gap: "10px" }}>
-            {(colorMode === "proximity"
+            {(colorMode === "proximity" && searchedLocation
               ? [
                   { color: "#e5484d", label: "<1MI" },
                   { color: "#d4a017", label: "<5MI" },

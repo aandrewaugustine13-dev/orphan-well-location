@@ -324,7 +324,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
 
     case "count_wells": {
       let q = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("*", { count: "exact", head: true })
         .ilike("state", action.state);
       if (action.county) q = q.ilike("county", action.county);
@@ -411,7 +411,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
           : "state, liability_est";
 
       let q = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select(selectCols)
         .ilike("state", action.state)
         .not("liability_est", "is", null);
@@ -448,7 +448,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
 
     case "inactivity_ranking": {
       let q = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("well_name, api_number, state, county, operator_name, months_inactive, liability_est")
         .ilike("state", action.state)
         .not("months_inactive", "is", null)
@@ -544,7 +544,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
 
     case "operator_summary": {
       let q = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("operator_name, liability_est")
         .ilike("state", action.state)
         .not("operator_name", "is", null);
@@ -586,7 +586,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
         : action.state;
 
       let countQ = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("*", { count: "exact", head: true })
         .ilike("state", action.state);
       if (action.county) countQ = countQ.ilike("county", action.county);
@@ -594,7 +594,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
       if (countErr) throw countErr;
 
       let dataQ = supabase
-        .from("wells")
+        .from("orphan_wells")
         .select("liability_est, months_inactive, operator_name")
         .ilike("state", action.state);
       if (action.county) dataQ = dataQ.ilike("county", action.county);

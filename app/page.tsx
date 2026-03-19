@@ -25,7 +25,7 @@ export default function Home() {
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [colorMode, setColorMode] = useState<ColorMode>("inactivity");
-  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number; zoom?: number; label?: string } | null>(null);
   const [nlSummary, setNlSummary] = useState<string | null>(null);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
@@ -33,11 +33,19 @@ export default function Home() {
   const handleCenterChange = useCallback((lat: number, lng: number) => setCenter({ lat, lng }), []);
   const handleError = useCallback((err: string | null) => setError(err), []);
 
-  const handleSearchLocation = useCallback((lat: number, lng: number) => {
-    setSearchLocation({ lat, lng, zoom: 13 });
+  const handleSearchLocation = useCallback((lat: number, lng: number, label: string) => {
+    setSearchLocation({ lat, lng, zoom: 13, label });
   }, []);
 
+  const handleColorModeChange = useCallback((mode: ColorMode) => {
+    // Proximity mode only makes sense when there's a searched address
+    if (mode === "proximity" && !searchLocation?.label) return;
+    setColorMode(mode);
+  }, [searchLocation]);
+
   const handleNLResult = useCallback((result: NLResult) => {
+    // NL results navigate the map but don't set a reference address — reset to inactivity
+    setColorMode("inactivity");
     setSearchLocation({
       lat: result.center.lat,
       lng: result.center.lng,
@@ -127,6 +135,7 @@ export default function Home() {
           colorMode={colorMode}
           searchLocation={searchLocation}
           searchedLocation={searchLocation}
+          searchedLabel={searchLocation?.label ?? null}
         />
 
         {!showLanding && (
@@ -200,9 +209,10 @@ export default function Home() {
             onToggle={() => setSidebarOpen(!sidebarOpen)}
             center={center}
             colorMode={colorMode}
-            onColorModeChange={setColorMode}
+            onColorModeChange={handleColorModeChange}
             onSearchLocation={handleSearchLocation}
             searchedLocation={searchLocation}
+            searchedLabel={searchLocation?.label ?? null}
           />
         </div>
       )}
