@@ -16,7 +16,7 @@ export interface Well {
   api_number: string;
   latitude: number;
   longitude: number;
-  miles_away: number;
+  miles_away?: number;
   spud_date?: string | null;
   liability_est?: number | null;
   operator_name?: string;
@@ -67,9 +67,10 @@ export function getInactivityColor(well: Well): string {
 }
 
 export function getWellColor(well: Well, mode: ColorMode): string {
-  return mode === "inactivity"
-    ? getInactivityColor(well)
-    : getProximityColor(well.miles_away);
+  if (mode === "inactivity" || well.miles_away == null) {
+    return getInactivityColor(well);
+  }
+  return getProximityColor(well.miles_away);
 }
 
 export function getInactivityRadius(well: Well, isSelected: boolean): number {
