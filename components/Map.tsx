@@ -13,9 +13,9 @@ import "leaflet/dist/leaflet.css";
 import {
   ColorMode,
   Well,
-  formatInactivity,
+  formatWellAge,
   formatLiability,
-  getInactivityRadius,
+  getWellAgeRadius,
   getWellColor,
   supabase,
 } from "@/utils/supabase";
@@ -309,7 +309,7 @@ export default function Map({
             <CircleMarker
               key={well.api_number}
               center={[well.latitude, well.longitude]}
-              radius={getInactivityRadius(well, isSelected)}
+              radius={getWellAgeRadius(well, isSelected)}
               pathOptions={{
                 color,
                 fillColor: color,
@@ -329,7 +329,7 @@ export default function Map({
                   {well.miles_away != null && searchedLabel && (
                     <div>{well.miles_away.toFixed(2)} mi from {searchedLabel}</div>
                   )}
-                  <div>Inactive: {formatInactivity(well)}</div>
+                  <div>Age: {formatWellAge(well)}</div>
                   <div>Liability: {formatLiability(well.liability_est)}</div>
                 </div>
               </Popup>

@@ -24,7 +24,7 @@ export default function Home() {
   const [center, setCenter] = useState({ lat: 39.8, lng: -98.5 });
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [colorMode, setColorMode] = useState<ColorMode>("inactivity");
+  const [colorMode, setColorMode] = useState<ColorMode>("age");
   const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number; zoom?: number; label?: string } | null>(null);
   const [nlSummary, setNlSummary] = useState<string | null>(null);
 
@@ -44,8 +44,8 @@ export default function Home() {
   }, [searchLocation]);
 
   const handleNLResult = useCallback((result: NLResult) => {
-    // NL results navigate the map but don't set a reference address — reset to inactivity
-    setColorMode("inactivity");
+    // NL results navigate the map but don't set a reference address — reset to age
+    setColorMode("age");
     setSearchLocation({
       lat: result.center.lat,
       lng: result.center.lng,

@@ -4,7 +4,8 @@ import {
   Well,
   ColorMode,
   getWellColor,
-  formatInactivity,
+  getWellAgeYears,
+  formatWellAge,
 } from "@/utils/supabase";
 import AddressSearch from "@/components/AddressSearch";
 
@@ -46,16 +47,22 @@ export default function Sidebar({
   searchedLocation,
   searchedLabel,
 }: SidebarProps) {
-  const longAbandoned = wells.filter((w) => (w.months_inactive || 0) >= 120);
+  const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);
 
   const sortedWells =
-    colorMode === "inactivity" || !searchedLocation
-      ? [...wells].sort((a, b) => (b.months_inactive || 0) - (a.months_inactive || 0))
+    colorMode === "age" || !searchedLocation
+      ? [...wells].sort((a, b) => {
+          const ageA = getWellAgeYears(a) ?? -Infinity;
+          const ageB = getWellAgeYears(b) ?? -Infinity;
+          return ageB - ageA;
+        })
       : [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity));
 
-  const longestInactive = [...wells].sort(
-    (a, b) => (b.months_inactive || 0) - (a.months_inactive || 0)
-  )[0];
+  const oldestWell = [...wells].sort((a, b) => {
+    const ageA = getWellAgeYears(a) ?? -Infinity;
+    const ageB = getWellAgeYears(b) ?? -Infinity;
+    return ageB - ageA;
+  })[0];
 
   const stats = [
     {
@@ -64,15 +71,15 @@ export default function Sidebar({
       color: "#e0e0e0",
     },
     {
-      label: "10+ YR INACTIVE",
-      value: loading ? "—" : String(longAbandoned.length),
-      color: longAbandoned.length > 0 ? "#e5484d" : "#555",
+      label: "20+ YR OLD",
+      value: loading ? "—" : String(oldWells.length),
+      color: oldWells.length > 0 ? "#e5484d" : "#555",
     },
     {
-      label: "LONGEST INACTIVE",
-      value: loading || !longestInactive ? "—" : formatInactivity(longestInactive).toUpperCase(),
+      label: "OLDEST WELL",
+      value: loading || !oldestWell ? "—" : formatWellAge(oldestWell).toUpperCase(),
       color:
-        longestInactive && (longestInactive.months_inactive || 0) >= 120 ? "#e5484d" : "#d4a017",
+        oldestWell && (getWellAgeYears(oldestWell) ?? 0) >= 20 ? "#e5484d" : "#d4a017",
     },
   ];
 
@@ -201,27 +208,27 @@ export default function Sidebar({
         </div>
 
         {/* ── Color mode — only show proximity when address is set ── */}
-        <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
-          <div style={{ ...LABEL_STYLE, marginBottom: "7px" }}>COLOR BY</div>
-          <div style={{ display: "flex", gap: "6px" }}>
-            <button
-              onClick={() => onColorModeChange("inactivity")}
-              style={{
-                flex: 1,
-                padding: "5px 0",
-                fontSize: "9px",
-                fontWeight: 500,
-                letterSpacing: "0.12em",
-                color: colorMode === "inactivity" ? "#e0e0e0" : "#444",
-                background: "none",
-                border: colorMode === "inactivity" ? "1px solid #666" : "1px solid #222",
-                cursor: "pointer",
-                fontFamily: "var(--font-mono)",
-              }}
-            >
-              INACTIVITY
-            </button>
-            {searchedLocation && (
+        {searchedLocation && (
+          <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
+            <div style={{ ...LABEL_STYLE, marginBottom: "7px" }}>COLOR BY</div>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                onClick={() => onColorModeChange("age")}
+                style={{
+                  flex: 1,
+                  padding: "5px 0",
+                  fontSize: "9px",
+                  fontWeight: 500,
+                  letterSpacing: "0.12em",
+                  color: colorMode === "age" ? "#e0e0e0" : "#444",
+                  background: "none",
+                  border: colorMode === "age" ? "1px solid #666" : "1px solid #222",
+                  cursor: "pointer",
+                  fontFamily: "var(--font-mono)",
+                }}
+              >
+                WELL AGE
+              </button>
               <button
                 onClick={() => onColorModeChange("proximity")}
                 style={{
@@ -239,9 +246,9 @@ export default function Sidebar({
               >
                 PROXIMITY
               </button>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* ── Statistics ── */}
         <div style={{ padding: "12px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
@@ -346,7 +353,7 @@ export default function Sidebar({
               colorMode === "proximity" && !!searchedLocation && well.miles_away != null;
             const metricValue = showDistance
               ? `${well.miles_away!.toFixed(1)}MI`
-              : formatInactivity(well).toUpperCase();
+              : formatWellAge(well).toUpperCase();
 
             return (
               <button
@@ -438,9 +445,9 @@ export default function Sidebar({
                   { color: "#30a46c", label: "5+MI" },
                 ]
               : [
-                  { color: "#e5484d", label: "10+YR" },
-                  { color: "#d4a017", label: "5-10" },
-                  { color: "#30a46c", label: "<5YR" },
+                  { color: "#30a46c", label: "<10YR" },
+                  { color: "#f0a000", label: "10-20" },
+                  { color: "#e5484d", label: "20+YR" },
                 ]
             ).map(({ color, label }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>

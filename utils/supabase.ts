@@ -30,18 +30,21 @@ export interface Well {
   district?: string;
 }
 
-export type ColorMode = "proximity" | "inactivity";
+export type ColorMode = "proximity" | "age";
 
-export function getInactivityYears(well: Well): number | null {
-  if (well.months_inactive == null) return null;
-  return Math.round((well.months_inactive / 12) * 10) / 10;
+export function getWellAgeYears(well: Well): number | null {
+  if (!well.spud_date) return null;
+  const spud = new Date(well.spud_date);
+  if (isNaN(spud.getTime())) return null;
+  const years = (Date.now() - spud.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  return Math.round(years * 10) / 10;
 }
 
-export function formatInactivity(well: Well): string {
-  if (well.months_inactive == null) return "Unknown";
-  const years = well.months_inactive / 12;
-  if (years >= 1) return `${years.toFixed(1)} yr`;
-  return `${well.months_inactive} mo`;
+export function formatWellAge(well: Well): string {
+  const years = getWellAgeYears(well);
+  if (years == null) return "Unknown";
+  if (years < 1) return "<1 yr";
+  return `${years.toFixed(1)} yr`;
 }
 
 export function formatLiability(est: number | null | undefined): string {
@@ -58,26 +61,26 @@ export function getProximityColor(miles: number): string {
   return "#30a46c";
 }
 
-export function getInactivityColor(well: Well): string {
-  const months = well.months_inactive;
-  if (months == null) return "#505c72";
-  if (months >= 120) return "#e5484d";  // 10+ years abandoned = red
-  if (months >= 60) return "#f0a000";   // 5-10 years = amber
-  return "#30a46c";                      // under 5 years = green
+export function getWellAgeColor(well: Well): string {
+  const years = getWellAgeYears(well);
+  if (years == null) return "#505c72";  // gray - no spud date
+  if (years >= 20) return "#e5484d";   // red - over 20 years
+  if (years >= 10) return "#f0a000";   // yellow - 10–20 years
+  return "#30a46c";                     // green - under 10 years
 }
 
 export function getWellColor(well: Well, mode: ColorMode): string {
-  if (mode === "inactivity" || well.miles_away == null) {
-    return getInactivityColor(well);
+  if (mode === "age" || well.miles_away == null) {
+    return getWellAgeColor(well);
   }
   return getProximityColor(well.miles_away);
 }
 
-export function getInactivityRadius(well: Well, isSelected: boolean): number {
+export function getWellAgeRadius(well: Well, isSelected: boolean): number {
   if (isSelected) return 10;
-  const months = well.months_inactive;
-  if (months == null) return 4;
-  if (months >= 120) return 8;
-  if (months >= 60) return 6;
+  const years = getWellAgeYears(well);
+  if (years == null) return 4;
+  if (years >= 20) return 8;
+  if (years >= 10) return 6;
   return 5;
 }

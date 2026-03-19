@@ -24,8 +24,8 @@ interface CountWellsAction {
   state: string;
   county?: string | null;
   operator?: string | null;
-  min_months_inactive?: number | null;
-  max_months_inactive?: number | null;
+  min_age_years?: number | null;
+  max_age_years?: number | null;
   min_liability?: number | null;
   max_liability?: number | null;
 }
@@ -43,8 +43,8 @@ interface LiabilitySummaryAction {
   sort: "asc" | "desc";
   limit: number;
 }
-interface InactivityRankingAction {
-  action: "inactivity_ranking";
+interface AgeRankingAction {
+  action: "age_ranking";
   state: string;
   county?: string | null;
   limit: number;
@@ -78,7 +78,7 @@ type AnalyticsAction =
   | CountWellsAction
   | ProximityAnalysisAction
   | LiabilitySummaryAction
-  | InactivityRankingAction
+  | AgeRankingAction
   | GroundwaterRiskAction
   | OperatorSummaryAction
   | GeneralStatsAction
@@ -102,8 +102,7 @@ Table: wells  (orphan oil/gas wells)
 - operator_name text            — company that operated the well
 - well_type    text             — e.g. "Oil Well", "Gas Well", "Injection Well"
 - well_status  text             — e.g. "Orphaned", "Abandoned", "Plugged"
-- spud_date    date             — date drilling began
-- months_inactive int4          — months well has been inactive (120 = 10 years)
+- spud_date    date             — date drilling began; well age = years since spud_date
 - liability_est   float8        — estimated cleanup cost in USD
 - field_name   text             — oil/gas field name
 - lease_name   text             — lease name
@@ -128,7 +127,7 @@ Supabase RPCs available:
 === ACTION TYPES — return exactly one ===
 
 count_wells — count orphan wells matching optional filters
-{"action":"count_wells","state":"West Virginia","county":"Kanawha","operator":null,"min_months_inactive":null,"max_months_inactive":null,"min_liability":null,"max_liability":null}
+{"action":"count_wells","state":"West Virginia","county":"Kanawha","operator":null,"min_age_years":null,"max_age_years":null,"min_liability":null,"max_liability":null}
 
 proximity_analysis — how many orphan wells sit within X miles of groundwater wells
 {"action":"proximity_analysis","state":"Pennsylvania","county":"Butler","max_distance_miles":1}
@@ -137,8 +136,8 @@ liability_summary — sum estimated cleanup liability, grouped and ranked
 {"action":"liability_summary","state":"Texas","county":null,"group_by":"county","sort":"desc","limit":10}
 group_by must be one of: "county", "state", "operator"
 
-inactivity_ranking — list the longest-inactive orphan wells in an area
-{"action":"inactivity_ranking","state":"Oklahoma","county":null,"limit":10}
+age_ranking — list the oldest orphan wells (by spud_date) in an area
+{"action":"age_ranking","state":"Oklahoma","county":null,"limit":10}
 
 groundwater_risk — which groundwater wells have the most orphan wells nearby
 {"action":"groundwater_risk","state":"West Virginia","county":"Kanawha","max_distance_miles":1,"limit":10}
@@ -160,16 +159,17 @@ move_map — just navigate the map to a location with no analytics
 - "how many" / "count" / "total" questions → count_wells
 - "highest / most / top" grouped by geography or operator → liability_summary or operator_summary
 - "near water wells" / "risk to drinking water" → proximity_analysis or groundwater_risk
-- "longest abandoned" / "most inactive" / "dormant" → inactivity_ranking
+- "oldest" / "ancient" / "drilled decades ago" / "well age" → age_ranking
 - "show me" / "take me to" / "where are" / simple map navigation → move_map
 - "stats" / "overview" / "summary of the problem" → general_stats
+- Age filters: "older than X years" → min_age_years=X; "newer than X years" → max_age_years=X
 
 === EXAMPLES ===
 "how many orphan wells are in Kanawha County West Virginia"
-→ {"action":"count_wells","state":"West Virginia","county":"Kanawha","operator":null,"min_months_inactive":null,"max_months_inactive":null,"min_liability":null,"max_liability":null}
+→ {"action":"count_wells","state":"West Virginia","county":"Kanawha","operator":null,"min_age_years":null,"max_age_years":null,"min_liability":null,"max_liability":null}
 
-"wells abandoned more than 10 years in Ohio"
-→ {"action":"count_wells","state":"Ohio","county":null,"operator":null,"min_months_inactive":120,"max_months_inactive":null,"min_liability":null,"max_liability":null}
+"wells drilled more than 20 years ago in Ohio"
+→ {"action":"count_wells","state":"Ohio","county":null,"operator":null,"min_age_years":20,"max_age_years":null,"min_liability":null,"max_liability":null}
 
 "which county in Texas has the highest total cleanup liability"
 → {"action":"liability_summary","state":"Texas","county":null,"group_by":"county","sort":"desc","limit":10}
@@ -180,8 +180,8 @@ move_map — just navigate the map to a location with no analytics
 "which water wells in West Virginia are most threatened by orphan wells"
 → {"action":"groundwater_risk","state":"West Virginia","county":null,"max_distance_miles":2,"limit":10}
 
-"longest abandoned wells in Oklahoma"
-→ {"action":"inactivity_ranking","state":"Oklahoma","county":null,"limit":10}
+"oldest orphan wells in Oklahoma"
+→ {"action":"age_ranking","state":"Oklahoma","county":null,"limit":10}
 
 "which operators abandoned the most wells in Texas"
 → {"action":"operator_summary","state":"Texas","county":null,"limit":10}
@@ -329,8 +329,16 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
         .ilike("state", action.state);
       if (action.county) q = q.ilike("county", action.county);
       if (action.operator) q = q.ilike("operator_name", `%${action.operator}%`);
-      if (action.min_months_inactive != null) q = q.gte("months_inactive", action.min_months_inactive);
-      if (action.max_months_inactive != null) q = q.lte("months_inactive", action.max_months_inactive);
+      if (action.min_age_years != null) {
+        const cutoff = new Date();
+        cutoff.setFullYear(cutoff.getFullYear() - action.min_age_years);
+        q = q.lte("spud_date", cutoff.toISOString().split("T")[0]);
+      }
+      if (action.max_age_years != null) {
+        const cutoff = new Date();
+        cutoff.setFullYear(cutoff.getFullYear() - action.max_age_years);
+        q = q.gte("spud_date", cutoff.toISOString().split("T")[0]);
+      }
       if (action.min_liability != null) q = q.gte("liability_est", action.min_liability);
       if (action.max_liability != null) q = q.lte("liability_est", action.max_liability);
       const { count, error } = await q;
@@ -341,8 +349,8 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
           location: action.county ? `${action.county} County, ${action.state}` : action.state,
           filters: {
             operator: action.operator ?? null,
-            min_months_inactive: action.min_months_inactive ?? null,
-            max_months_inactive: action.max_months_inactive ?? null,
+            min_age_years: action.min_age_years ?? null,
+            max_age_years: action.max_age_years ?? null,
             min_liability: action.min_liability ?? null,
             max_liability: action.max_liability ?? null,
           },
@@ -446,32 +454,36 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
       };
     }
 
-    case "inactivity_ranking": {
+    case "age_ranking": {
       let q = supabase
         .from("orphan_wells")
-        .select("well_name, api_number, state, county, operator_name, months_inactive, liability_est")
+        .select("well_name, api_number, state, county, operator_name, spud_date, liability_est")
         .ilike("state", action.state)
-        .not("months_inactive", "is", null)
-        .order("months_inactive", { ascending: false })
+        .not("spud_date", "is", null)
+        .order("spud_date", { ascending: true })
         .limit(action.limit ?? 10);
       if (action.county) q = q.ilike("county", action.county);
       const { data, error } = await q;
       if (error) throw error;
 
+      const now = Date.now();
       return {
         results: {
           location: action.county ? `${action.county} County, ${action.state}` : action.state,
-          top_inactive_wells: (data ?? []).map((w: Record<string, unknown>) => ({
-            well_name: w.well_name,
-            operator_name: w.operator_name,
-            county: w.county,
-            months_inactive: w.months_inactive,
-            years_inactive:
-              w.months_inactive != null
-                ? Math.round(((w.months_inactive as number) / 12) * 10) / 10
-                : null,
-            liability_est: w.liability_est,
-          })),
+          oldest_wells: (data ?? []).map((w: Record<string, unknown>) => {
+            const spud = w.spud_date ? new Date(w.spud_date as string) : null;
+            const ageYears = spud
+              ? Math.round(((now - spud.getTime()) / (1000 * 60 * 60 * 24 * 365.25)) * 10) / 10
+              : null;
+            return {
+              well_name: w.well_name,
+              operator_name: w.operator_name,
+              county: w.county,
+              spud_date: w.spud_date,
+              age_years: ageYears,
+              liability_est: w.liability_est,
+            };
+          }),
         },
         center,
         radiusMiles: defaultRadius,
@@ -595,7 +607,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
 
       let dataQ = supabase
         .from("orphan_wells")
-        .select("liability_est, months_inactive, operator_name")
+        .select("liability_est, spud_date, operator_name")
         .ilike("state", action.state);
       if (action.county) dataQ = dataQ.ilike("county", action.county);
       const { data: statsData, error: statsErr } = await dataQ.limit(50000);
@@ -603,25 +615,24 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
 
       const rows = (statsData ?? []) as Array<{
         liability_est?: number | null;
-        months_inactive?: number | null;
+        spud_date?: string | null;
         operator_name?: string | null;
       }>;
 
       const liabilityRows = rows.filter((r) => r.liability_est != null);
       const totalLiability = liabilityRows.reduce((s, r) => s + (r.liability_est ?? 0), 0);
 
-      const inactivityRows = rows.filter((r) => r.months_inactive != null);
-      const avgMonthsInactive =
-        inactivityRows.length > 0
-          ? Math.round(
-              inactivityRows.reduce((s, r) => s + (r.months_inactive ?? 0), 0) /
-                inactivityRows.length
-            )
+      const now = Date.now();
+      const ageRows = rows.filter((r) => r.spud_date != null).map((r) => {
+        const spud = new Date(r.spud_date!);
+        return (now - spud.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+      });
+      const avgAgeYears =
+        ageRows.length > 0
+          ? Math.round((ageRows.reduce((s, a) => s + a, 0) / ageRows.length) * 10) / 10
           : null;
 
-      const longAbandoned = rows.filter(
-        (r) => r.months_inactive != null && (r.months_inactive as number) >= 120
-      ).length;
+      const oldWellCount = ageRows.filter((a) => a >= 20).length;
 
       const opCounts: Record<string, number> = {};
       for (const r of rows) {
@@ -638,12 +649,9 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
           total_orphan_wells: totalCount,
           total_liability_est_usd: Math.round(totalLiability),
           wells_with_liability_data: liabilityRows.length,
-          avg_months_inactive: avgMonthsInactive,
-          avg_years_inactive:
-            avgMonthsInactive != null
-              ? Math.round((avgMonthsInactive / 12) * 10) / 10
-              : null,
-          wells_abandoned_10_plus_years: longAbandoned,
+          avg_age_years: avgAgeYears,
+          wells_with_spud_date: ageRows.length,
+          wells_over_20_years_old: oldWellCount,
           top_operator: topOperator
             ? { name: topOperator[0], well_count: topOperator[1] }
             : null,
