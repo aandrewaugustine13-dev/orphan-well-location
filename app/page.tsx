@@ -9,7 +9,12 @@ import { Well, ColorMode } from "@/utils/supabase";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
-const MILES_TO_METERS = 1609.34;
+function radiusToZoom(miles: number): number {
+  if (miles <= 10) return 12;
+  if (miles <= 50) return 10;
+  if (miles <= 200) return 8;
+  return 7;
+}
 
 export default function Home() {
   const [showLanding, setShowLanding] = useState(true);
@@ -17,94 +22,94 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [center, setCenter] = useState({ lat: 39.8, lng: -98.5 });
-  const [radiusMiles, setRadiusMiles] = useState(10);
   const [selectedWellApi, setSelectedWellApi] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [colorMode, setColorMode] = useState<ColorMode>("proximity");
-  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [colorMode, setColorMode] = useState<ColorMode>("inactivity");
+  const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
   const [nlSummary, setNlSummary] = useState<string | null>(null);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
   const handleCenterChange = useCallback((lat: number, lng: number) => setCenter({ lat, lng }), []);
   const handleError = useCallback((err: string | null) => setError(err), []);
+
   const handleSearchLocation = useCallback((lat: number, lng: number) => {
-    setSearchLocation({ lat, lng });
+    setSearchLocation({ lat, lng, zoom: 13 });
   }, []);
+
   const handleNLResult = useCallback((result: NLResult) => {
-    setSearchLocation({ lat: result.center.lat, lng: result.center.lng });
-    setRadiusMiles(result.radiusMiles);
+    setSearchLocation({
+      lat: result.center.lat,
+      lng: result.center.lng,
+      zoom: radiusToZoom(result.radiusMiles),
+    });
     setNlSummary(result.summary);
   }, []);
 
   return (
-    <div style={{ position: "relative", width: "100vw", height: "100vh" }}>
+    <div style={{ position: "relative", width: "100vw", height: "100vh", fontFamily: "var(--font-mono)" }}>
       {showLanding && <LandingOverlay onEnter={() => setShowLanding(false)} />}
 
+      {/* ── Top bar ── */}
       <div
         style={{
           position: "absolute",
           top: 0,
           left: 0,
           right: 0,
-          height: "40px",
-          background: "var(--bg-card)",
-          borderBottom: "1px solid var(--border)",
+          height: "36px",
+          background: "#111",
+          borderBottom: "1px solid #222",
           zIndex: 999,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "0 20px",
+          padding: "0 16px",
           opacity: showLanding ? 0 : 1,
           transition: "opacity 0.3s ease-out",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div
+        <span
+          style={{
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.18em",
+            color: "#e0e0e0",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          ORPHAN WELL LOCATOR
+        </span>
+
+        <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+          <span
             style={{
-              width: "24px",
-              height: "24px",
-              borderRadius: "6px",
-              background: "var(--accent-soft)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              fontSize: "10px",
+              color: loading ? "#555" : "#888",
+              fontFamily: "var(--font-mono)",
+              letterSpacing: "0.06em",
             }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="10" r="3" stroke="var(--accent)" strokeWidth="2" />
-              <path d="M12 2C7.58 2 4 5.58 4 10c0 5.25 8 12 8 12s8-6.75 8-12c0-4.42-3.58-8-8-8z" stroke="var(--accent)" strokeWidth="2" fill="none" />
-            </svg>
-          </div>
-          <span style={{ fontSize: "14px", fontWeight: 600, letterSpacing: "-0.01em" }}>
-            Orphan Well Locator
+            {loading ? "LOADING..." : `${wells.length} WELLS IN VIEW`}
           </span>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-            <div
-              style={{
-                width: "6px",
-                height: "6px",
-                borderRadius: "50%",
-                background: loading ? "var(--text-tertiary)" : "var(--green)",
-              }}
-            />
-            <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-              {loading ? "Scanning..." : `${wells.length} wells`}
-            </span>
-          </div>
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--text-tertiary)" }}>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "10px",
+              color: "#444",
+              letterSpacing: "0.04em",
+            }}
+          >
             {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
           </span>
         </div>
       </div>
 
+      {/* ── Map area ── */}
       <div
         style={{
           position: "absolute",
-          top: "40px",
+          top: "36px",
           left: 0,
           right: 0,
           bottom: 0,
@@ -117,53 +122,48 @@ export default function Home() {
           onLoadingChange={handleLoadingChange}
           onCenterChange={handleCenterChange}
           onError={handleError}
-          radiusMeters={Math.round(radiusMiles * MILES_TO_METERS)}
           selectedWellApi={selectedWellApi}
           onSelectWell={setSelectedWellApi}
           colorMode={colorMode}
           searchLocation={searchLocation}
+          searchedLocation={searchLocation}
         />
 
         {!showLanding && (
-          <NLSearchBar
-            onResult={handleNLResult}
-            onError={() => {}}
-          />
+          <NLSearchBar onResult={handleNLResult} onError={() => {}} />
         )}
 
+        {/* NL summary toast */}
         {!showLanding && nlSummary && (
           <div
             style={{
               position: "absolute",
-              bottom: "32px",
+              bottom: "28px",
               left: "50%",
               transform: "translateX(-50%)",
               width: "min(520px, calc(100vw - 48px))",
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-strong)",
-              borderRadius: "var(--radius-sm)",
-              padding: "12px 16px",
-              boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
+              background: "#111",
+              border: "1px solid #444",
+              padding: "10px 14px",
               zIndex: 800,
               display: "flex",
               alignItems: "flex-start",
               gap: "10px",
+              fontFamily: "var(--font-mono)",
             }}
           >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="var(--accent)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              style={{ flexShrink: 0, marginTop: "1px" }}
+            <span
+              style={{
+                fontSize: "9px",
+                color: "#d4a017",
+                letterSpacing: "0.12em",
+                flexShrink: 0,
+                marginTop: "2px",
+              }}
             >
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4M12 16h.01" />
-            </svg>
-            <span style={{ fontSize: "13px", color: "var(--text-primary)", flex: 1, lineHeight: 1.5 }}>
+              ▶
+            </span>
+            <span style={{ fontSize: "11px", color: "#888", flex: 1, lineHeight: 1.6 }}>
               {nlSummary}
             </span>
             <button
@@ -171,31 +171,29 @@ export default function Home() {
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--text-tertiary)",
+                color: "#444",
                 cursor: "pointer",
                 padding: "0",
-                display: "flex",
-                alignItems: "center",
+                fontSize: "14px",
                 flexShrink: 0,
+                fontFamily: "var(--font-mono)",
+                lineHeight: 1,
               }}
               aria-label="Dismiss"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
+              ×
             </button>
           </div>
         )}
       </div>
 
+      {/* ── Sidebar ── */}
       {!showLanding && (
-        <div style={{ position: "absolute", top: "40px", left: 0, bottom: 0, zIndex: 1000 }}>
+        <div style={{ position: "absolute", top: "36px", left: 0, bottom: 0, zIndex: 1000 }}>
           <Sidebar
             wells={wells}
             loading={loading}
             error={error}
-            radiusMiles={radiusMiles}
-            onRadiusChange={setRadiusMiles}
             selectedWellApi={selectedWellApi}
             onSelectWell={setSelectedWellApi}
             isOpen={sidebarOpen}
@@ -204,6 +202,7 @@ export default function Home() {
             colorMode={colorMode}
             onColorModeChange={setColorMode}
             onSearchLocation={handleSearchLocation}
+            searchedLocation={searchLocation}
           />
         </div>
       )}

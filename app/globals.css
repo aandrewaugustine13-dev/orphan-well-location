@@ -1,39 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
 :root {
-  --bg-base: #0c1220;
-  --bg-card: #131a2b;
-  --bg-card-hover: #182036;
-  --bg-surface: #1a2238;
-  --bg-input: #0f1726;
+  --bg-base: #0a0a0a;
+  --bg-card: #111111;
+  --bg-card-hover: #1a1a1a;
+  --bg-surface: #181818;
+  --bg-input: #0a0a0a;
 
-  --text-primary: #f0f2f5;
-  --text-secondary: #8b95a8;
-  --text-tertiary: #505c72;
+  --text-primary: #e0e0e0;
+  --text-secondary: #888888;
+  --text-tertiary: #555555;
 
-  --accent: #2d7ff9;
-  --accent-soft: rgba(45, 127, 249, 0.1);
-  --accent-hover: #4a93ff;
+  --accent: #d4a017;
+  --accent-soft: rgba(212, 160, 23, 0.08);
 
   --red: #e5484d;
-  --red-soft: rgba(229, 72, 77, 0.1);
-  --amber: #f0a000;
-  --amber-soft: rgba(240, 160, 0, 0.08);
+  --red-soft: rgba(229, 72, 77, 0.08);
+  --amber: #d4a017;
+  --amber-soft: rgba(212, 160, 23, 0.06);
   --green: #30a46c;
-  --green-soft: rgba(48, 164, 108, 0.1);
+  --green-soft: rgba(48, 164, 108, 0.06);
 
-  --border: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.1);
+  --border: #333333;
+  --border-strong: #444444;
 
-  --radius: 8px;
-  --radius-sm: 6px;
+  --radius: 0px;
+  --radius-sm: 0px;
 
-  --font-sans: 'Outfit', system-ui, -apple-system, sans-serif;
-  --font-mono: 'IBM Plex Mono', monospace;
+  --font-sans: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', monospace;
 }
 
 * {
@@ -46,58 +45,66 @@ html, body {
   overflow: hidden;
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-sans);
+  font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
+  font-size: 13px;
 }
 
-/* Leaflet */
+/* ── Leaflet ───────────────────────────────────────────────── */
+
 .leaflet-container {
   background: var(--bg-base) !important;
-  font-family: var(--font-sans) !important;
+  font-family: var(--font-mono) !important;
 }
 
+/* Popup — square, no shadow, no tip triangle */
 .leaflet-popup-content-wrapper {
-  background: var(--bg-card) !important;
+  background: #111111 !important;
   color: var(--text-primary) !important;
-  border-radius: var(--radius) !important;
-  border: 1px solid var(--border-strong) !important;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35) !important;
-  font-family: var(--font-sans) !important;
+  border-radius: 0 !important;
+  border: 1px solid #444444 !important;
+  box-shadow: none !important;
+  font-family: var(--font-mono) !important;
 }
 
-.leaflet-popup-tip {
-  background: var(--bg-card) !important;
+.leaflet-popup-tip-container {
+  display: none !important;
 }
 
 .leaflet-popup-content {
-  margin: 14px 16px !important;
-  font-size: 13px !important;
-  line-height: 1.5 !important;
+  margin: 10px 14px !important;
+  font-size: 11px !important;
+  line-height: 1.7 !important;
+  font-family: var(--font-mono) !important;
 }
 
 .leaflet-popup-close-button {
-  color: var(--text-tertiary) !important;
-  font-size: 20px !important;
-  right: 8px !important;
-  top: 6px !important;
+  color: #555 !important;
+  font-size: 14px !important;
+  right: 6px !important;
+  top: 5px !important;
+  font-family: var(--font-mono) !important;
 }
 
+/* Zoom controls */
 .leaflet-control-zoom {
-  border: none !important;
-  border-radius: var(--radius) !important;
+  border: 1px solid #333 !important;
+  border-radius: 0 !important;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+  box-shadow: none !important;
 }
 
 .leaflet-control-zoom a {
-  background: var(--bg-card) !important;
-  color: var(--text-secondary) !important;
+  background: #111 !important;
+  color: #666 !important;
   border: none !important;
-  border-bottom: 1px solid var(--border) !important;
-  width: 36px !important;
-  height: 36px !important;
-  line-height: 36px !important;
-  font-size: 16px !important;
+  border-bottom: 1px solid #333 !important;
+  width: 28px !important;
+  height: 28px !important;
+  line-height: 28px !important;
+  font-size: 14px !important;
+  font-family: var(--font-mono) !important;
+  border-radius: 0 !important;
 }
 
 .leaflet-control-zoom a:last-child {
@@ -105,23 +112,28 @@ html, body {
 }
 
 .leaflet-control-zoom a:hover {
-  background: var(--bg-card-hover) !important;
-  color: var(--text-primary) !important;
+  background: #1a1a1a !important;
+  color: #e0e0e0 !important;
 }
 
+/* Attribution */
 .leaflet-control-attribution {
-  background: rgba(12, 18, 32, 0.9) !important;
-  color: var(--text-tertiary) !important;
-  font-size: 10px !important;
+  background: rgba(10, 10, 10, 0.95) !important;
+  color: #444 !important;
+  font-size: 9px !important;
+  font-family: var(--font-mono) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
 }
 
 .leaflet-control-attribution a {
-  color: var(--text-secondary) !important;
+  color: #666 !important;
 }
 
-/* Scrollbar */
+/* ── Scrollbar — thin, square ─────────────────────────────── */
+
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 3px;
 }
 
 ::-webkit-scrollbar-track {
@@ -129,51 +141,19 @@ html, body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--bg-surface);
-  border-radius: 3px;
+  background: #2a2a2a;
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-tertiary);
+  background: #444;
 }
 
-/* Range input */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 4px;
-  background: var(--bg-surface);
-  border-radius: 2px;
-  outline: none;
-}
+/* ── Animations ───────────────────────────────────────────── */
 
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  background: var(--accent);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid var(--bg-base);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  background: var(--accent);
-  border-radius: 50%;
-  cursor: pointer;
-  border: 3px solid var(--bg-base);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Animations - minimal, purposeful */
 @keyframes fade-in {
   from { opacity: 0; }
-  to { opacity: 1; }
+  to   { opacity: 1; }
 }
 
 @keyframes spin {

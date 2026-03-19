@@ -37,16 +37,13 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         setShowResults(false);
       }
     }
-
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   useEffect(() => {
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
+      if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, []);
 
@@ -56,16 +53,8 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
   }
 
   async function fetchJson(url: string): Promise<SearchResult[]> {
-    const response = await fetch(url, {
-      headers: {
-        "Accept-Language": "en",
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Geocoding failed with status ${response.status}`);
-    }
-
+    const response = await fetch(url, { headers: { "Accept-Language": "en" } });
+    if (!response.ok) throw new Error(`Geocoding failed with status ${response.status}`);
     return response.json();
   }
 
@@ -91,7 +80,6 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
         data = await fetchJson(
           `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&postalcode=${trimmed}&limit=5`
         );
-
         if (!data.length) {
           data = await fetchJson(
             `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(
@@ -121,28 +109,22 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
       setShowResults(normalized.length > 0);
 
       if (normalized.length === 0) {
-        setError("No results found. Try a full street address or valid US ZIP code.");
+        setError("no results — try a full street address or US zip code");
       }
     } catch {
       if (requestId !== requestIdRef.current) return;
       setResults([]);
       setShowResults(false);
-      setError("Could not geocode this location right now. Please try again.");
+      setError("geocoding failed — please try again");
     } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
   function handleInput(value: string) {
     setQuery(value);
     setError(null);
-
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => search(value), 350);
   }
 
@@ -162,69 +144,52 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
       }
       return;
     }
-
-    if (e.key === "Escape") {
-      setShowResults(false);
-    }
+    if (e.key === "Escape") setShowResults(false);
   }
 
   return (
-    <div ref={containerRef} style={{ position: "relative", width: "100%" }}>
+    <div ref={containerRef} style={{ position: "relative", width: "100%", fontFamily: "var(--font-mono)" }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          background: "var(--bg-base)",
-          borderRadius: "var(--radius-sm)",
-          border: "1px solid var(--border)",
-          padding: "0 12px",
+          background: "#0a0a0a",
+          border: "1px solid #2a2a2a",
+          padding: "0 10px",
           gap: "8px",
         }}
       >
-        <svg
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="var(--text-tertiary)"
-          strokeWidth="2"
-          strokeLinecap="round"
-          style={{ flexShrink: 0 }}
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="M21 21l-4.35-4.35" />
-        </svg>
+        <span style={{ color: "#444", fontSize: "11px", flexShrink: 0 }}>/</span>
 
         <input
           type="text"
           value={query}
           onChange={(e) => handleInput(e.target.value)}
           onFocus={() => {
-            if (results.length > 0) {
-              setShowResults(true);
-            }
+            if (results.length > 0) setShowResults(true);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="Search address or ZIP code..."
+          placeholder="address or zip code..."
           style={{
             flex: 1,
             background: "transparent",
             border: "none",
             outline: "none",
-            color: "var(--text-primary)",
-            fontSize: "13px",
-            fontFamily: "var(--font-sans)",
-            padding: "10px 0",
+            color: "#e0e0e0",
+            fontSize: "11px",
+            fontFamily: "var(--font-mono)",
+            padding: "8px 0",
+            letterSpacing: "0.02em",
           }}
         />
 
         {loading ? (
           <div
             style={{
-              width: "12px",
-              height: "12px",
-              border: "2px solid var(--bg-surface)",
-              borderTopColor: "var(--accent)",
+              width: "8px",
+              height: "8px",
+              border: "1px solid #333",
+              borderTopColor: "#888",
               borderRadius: "50%",
               animation: "spin 0.8s linear infinite",
               flexShrink: 0,
@@ -241,18 +206,18 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
             style={{
               background: "none",
               border: "none",
-              color: "var(--text-tertiary)",
+              color: "#444",
               cursor: "pointer",
               padding: "2px",
               display: "flex",
               alignItems: "center",
               flexShrink: 0,
+              fontSize: "14px",
+              fontFamily: "var(--font-mono)",
             }}
             aria-label="Clear search"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M18 6L6 18M6 6l12 12" />
-            </svg>
+            ×
           </button>
         ) : null}
       </div>
@@ -260,9 +225,10 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
       {error && (
         <div
           style={{
-            marginTop: "6px",
-            fontSize: "11px",
-            color: "var(--red)",
+            marginTop: "4px",
+            fontSize: "10px",
+            color: "#e5484d",
+            letterSpacing: "0.03em",
           }}
         >
           {error}
@@ -276,11 +242,9 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
             top: "100%",
             left: 0,
             right: 0,
-            marginTop: "4px",
-            background: "var(--bg-card)",
-            border: "1px solid var(--border-strong)",
-            borderRadius: "var(--radius-sm)",
-            boxShadow: "0 8px 24px rgba(0,0,0,0.3)",
+            marginTop: "1px",
+            background: "#111",
+            border: "1px solid #444",
             zIndex: 10,
             overflow: "hidden",
           }}
@@ -298,25 +262,24 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
                   display: "block",
                   width: "100%",
                   textAlign: "left",
-                  padding: "10px 12px",
+                  padding: "8px 12px",
                   background: "transparent",
                   border: "none",
-                  borderBottom: i < results.length - 1 ? "1px solid var(--border)" : "none",
+                  borderBottom: i < results.length - 1 ? "1px solid #222" : "none",
                   cursor: "pointer",
-                  color: "var(--text-primary)",
-                  fontFamily: "var(--font-sans)",
-                  transition: "background 0.1s",
+                  color: "#e0e0e0",
+                  fontFamily: "var(--font-mono)",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-card-hover)";
+                  e.currentTarget.style.background = "#1a1a1a";
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.background = "transparent";
                 }}
               >
-                <div style={{ fontSize: "13px", fontWeight: 500 }}>{main}</div>
+                <div style={{ fontSize: "11px", color: "#e0e0e0" }}>{main}</div>
                 {sub && (
-                  <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                  <div style={{ fontSize: "10px", color: "#555", marginTop: "2px", letterSpacing: "0.02em" }}>
                     {sub}
                   </div>
                 )}
