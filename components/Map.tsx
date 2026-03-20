@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CircleMarker,
+  ImageOverlay,
   MapContainer,
   Popup,
   TileLayer,
-  WMSTileLayer,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -133,6 +133,55 @@ function MapController({
   });
 
   return null;
+}
+
+const FEMA_EXPORT =
+  "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export";
+
+function FloodZoneOverlay() {
+  const map = useMap();
+  const [overlay, setOverlay] = useState<{
+    url: string;
+    bounds: [[number, number], [number, number]];
+  } | null>(null);
+
+  useEffect(() => {
+    function update() {
+      const b = map.getBounds();
+      const sz = map.getSize();
+      const minX = b.getWest();
+      const minY = b.getSouth();
+      const maxX = b.getEast();
+      const maxY = b.getNorth();
+      const params = new URLSearchParams({
+        bbox: `${minX},${minY},${maxX},${maxY}`,
+        bboxSR: "4326",
+        layers: "show:28",
+        size: `${sz.x},${sz.y}`,
+        imageSR: "4326",
+        format: "png32",
+        transparent: "true",
+        f: "image",
+      });
+      setOverlay({
+        url: `${FEMA_EXPORT}?${params}`,
+        bounds: [[minY, minX], [maxY, maxX]],
+      });
+    }
+    map.on("moveend", update);
+    update();
+    return () => { map.off("moveend", update); };
+  }, [map]);
+
+  if (!overlay) return null;
+  return (
+    <ImageOverlay
+      url={overlay.url}
+      bounds={overlay.bounds}
+      opacity={0.55}
+      zIndex={400}
+    />
+  );
 }
 
 export default function Map({
@@ -353,17 +402,7 @@ export default function Map({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {showFloodZones && (
-          <WMSTileLayer
-            url="https://hazards.fema.gov/arcgis/services/public/NFHL/MapServer/WMSServer"
-            layers="28"
-            format="image/png"
-            transparent={true}
-            opacity={0.5}
-            version="1.1.1"
-            attribution='&copy; <a href="https://www.fema.gov/flood-maps">FEMA NFHL</a>'
-          />
-        )}
+        {showFloodZones && <FloodZoneOverlay />}
 
         <MapController programmaticMove={programmaticMove} onMoveEnd={handleMoveEnd} />
 
