@@ -62,6 +62,14 @@ interface OperatorSummaryAction {
   county?: string | null;
   limit: number;
 }
+interface GroupCountAction {
+  action: "group_count";
+  state: string;
+  county?: string | null;
+  group_by: "county" | "operator" | "well_type" | "well_status";
+  sort: "asc" | "desc";
+  limit: number;
+}
 interface GeneralStatsAction {
   action: "general_stats";
   state: string;
@@ -81,6 +89,7 @@ type AnalyticsAction =
   | AgeRankingAction
   | GroundwaterRiskAction
   | OperatorSummaryAction
+  | GroupCountAction
   | GeneralStatsAction
   | MoveMapAction;
 
@@ -142,8 +151,12 @@ age_ranking — list the oldest orphan wells (by spud_date) in an area
 groundwater_risk — which groundwater wells have the most orphan wells nearby
 {"action":"groundwater_risk","state":"West Virginia","county":"Kanawha","max_distance_miles":1,"limit":10}
 
-operator_summary — which operators have abandoned the most wells
+operator_summary — which operators have the highest liability burden (details on operator responsibility)
 {"action":"operator_summary","state":"Texas","county":null,"limit":10}
+
+group_count — count wells grouped by a categorical field (county, operator, well_type, or well_status)
+{"action":"group_count","state":"Texas","county":null,"group_by":"county","sort":"desc","limit":10}
+group_by must be one of: "county", "operator", "well_type", "well_status"
 
 general_stats — overall statistics for a state or county
 {"action":"general_stats","state":"Ohio","county":"Cuyahoga"}
@@ -157,7 +170,11 @@ move_map — just navigate the map to a location with no analytics
 - All numeric filter fields default to null unless explicitly mentioned
 - limit defaults to 10 when not specified
 - "how many" / "count" / "total" questions → count_wells
-- "highest / most / top" grouped by geography or operator → liability_summary or operator_summary
+- "which county has the most" / "top counties by count" / "most wells per county" → group_count with group_by "county"
+- "what types of wells" / "breakdown by well type" / "well status distribution" → group_count with group_by "well_type" or "well_status"
+- "which operator abandoned the most" / "top operators by count" → group_count with group_by "operator"
+- "highest liability" / "total cleanup cost" grouped by area → liability_summary
+- "operator liability" / "which operator owes the most" → operator_summary
 - "near water wells" / "risk to drinking water" → proximity_analysis or groundwater_risk
 - "oldest" / "ancient" / "drilled decades ago" / "well age" → age_ranking
 - "show me" / "take me to" / "where are" / simple map navigation → move_map
@@ -171,8 +188,26 @@ move_map — just navigate the map to a location with no analytics
 "wells drilled more than 20 years ago in Ohio"
 → {"action":"count_wells","state":"Ohio","county":null,"operator":null,"min_age_years":20,"max_age_years":null,"min_liability":null,"max_liability":null}
 
+"which county in Texas has the most orphan wells"
+→ {"action":"group_count","state":"Texas","county":null,"group_by":"county","sort":"desc","limit":10}
+
+"top counties in West Virginia by orphan well count"
+→ {"action":"group_count","state":"West Virginia","county":null,"group_by":"county","sort":"desc","limit":10}
+
+"what types of wells are in Colorado"
+→ {"action":"group_count","state":"Colorado","county":null,"group_by":"well_type","sort":"desc","limit":10}
+
+"breakdown of well status in Ohio"
+→ {"action":"group_count","state":"Ohio","county":null,"group_by":"well_status","sort":"desc","limit":10}
+
+"which operators have abandoned the most wells in Texas"
+→ {"action":"group_count","state":"Texas","county":null,"group_by":"operator","sort":"desc","limit":10}
+
 "which county in Texas has the highest total cleanup liability"
 → {"action":"liability_summary","state":"Texas","county":null,"group_by":"county","sort":"desc","limit":10}
+
+"which operators owe the most in liability in Pennsylvania"
+→ {"action":"operator_summary","state":"Pennsylvania","county":null,"limit":10}
 
 "orphan wells within 1 mile of drinking water wells in Butler County PA"
 → {"action":"proximity_analysis","state":"Pennsylvania","county":"Butler","max_distance_miles":1}
@@ -182,9 +217,6 @@ move_map — just navigate the map to a location with no analytics
 
 "oldest orphan wells in Oklahoma"
 → {"action":"age_ranking","state":"Oklahoma","county":null,"limit":10}
-
-"which operators abandoned the most wells in Texas"
-→ {"action":"operator_summary","state":"Texas","county":null,"limit":10}
 
 "overview of the orphan well problem in Wyoming"
 → {"action":"general_stats","state":"Wyoming","county":null}
@@ -229,7 +261,7 @@ async function planWithGemini(query: string, apiKey: string): Promise<AnalyticsA
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: ANALYTICS_SYSTEM_PROMPT }] },
         contents: [{ parts: [{ text: query }] }],
-        generationConfig: { maxOutputTokens: 512, responseMimeType: "application/json" },
+        generationConfig: { maxOutputTokens: 2048, responseMimeType: "application/json" },
       }),
     }
   );
@@ -586,6 +618,47 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
           location: action.county ? `${action.county} County, ${action.state}` : action.state,
           total_wells_analyzed: data?.length ?? 0,
           top_operators: sorted,
+        },
+        center,
+        radiusMiles: defaultRadius,
+      };
+    }
+
+    case "group_count": {
+      const colMap: Record<string, string> = {
+        county: "county",
+        operator: "operator_name",
+        well_type: "well_type",
+        well_status: "well_status",
+      };
+      const col = colMap[action.group_by] ?? action.group_by;
+
+      let q = supabase
+        .from("orphan_wells")
+        .select(col)
+        .ilike("state", action.state)
+        .not(col, "is", null);
+      if (action.county) q = q.ilike("county", action.county);
+      const { data, error } = await q.limit(100000);
+      if (error) throw error;
+
+      const counts: Record<string, number> = {};
+      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+        const key = (row[col] as string) ?? "Unknown";
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+
+      const sorted = Object.entries(counts)
+        .sort((a, b) => (action.sort === "desc" ? b[1] - a[1] : a[1] - b[1]))
+        .slice(0, action.limit ?? 10)
+        .map(([name, count]) => ({ name, well_count: count }));
+
+      return {
+        results: {
+          location: action.county ? `${action.county} County, ${action.state}` : action.state,
+          group_by: action.group_by,
+          total_wells_analyzed: data?.length ?? 0,
+          top_groups: sorted,
         },
         center,
         radiusMiles: defaultRadius,
