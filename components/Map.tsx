@@ -6,6 +6,7 @@ import {
   MapContainer,
   Popup,
   TileLayer,
+  WMSTileLayer,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -154,6 +155,7 @@ export default function Map({
   const [showGroundwater, setShowGroundwater] = useState(false);
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
   const [showEpaSites, setShowEpaSites] = useState(false);
+  const [showFloodZones, setShowFloodZones] = useState(false);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -351,6 +353,18 @@ export default function Map({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
+        {showFloodZones && (
+          <WMSTileLayer
+            url="https://hazards.fema.gov/arcgis/services/public/NFHL/MapServer/WMSServer"
+            layers="28"
+            format="image/png"
+            transparent={true}
+            opacity={0.5}
+            version="1.1.1"
+            attribution='&copy; <a href="https://www.fema.gov/flood-maps">FEMA NFHL</a>'
+          />
+        )}
+
         <MapController programmaticMove={programmaticMove} onMoveEnd={handleMoveEnd} />
 
         {wells.map((well) => {
@@ -489,6 +503,16 @@ export default function Map({
           }`}
         >
           {showEpaSites ? "Hide EPA Sites" : "Show EPA Sites"}
+        </button>
+        <button
+          onClick={() => setShowFloodZones((v) => !v)}
+          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
+            showFloodZones
+              ? "bg-cyan-600 text-white hover:bg-cyan-700"
+              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+          }`}
+        >
+          {showFloodZones ? "Hide Flood Zones" : "Show Flood Zones"}
         </button>
       </div>
     </div>
