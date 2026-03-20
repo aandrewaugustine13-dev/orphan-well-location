@@ -254,14 +254,14 @@ async function geocodeLocation(state: string, county?: string | null): Promise<{
 
 async function planWithGemini(query: string, apiKey: string): Promise<AnalyticsAction> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: ANALYTICS_SYSTEM_PROMPT }] },
         contents: [{ parts: [{ text: query }] }],
-        generationConfig: { maxOutputTokens: 2048, responseMimeType: "application/json" },
+        generationConfig: { maxOutputTokens: 512, responseMimeType: "application/json" },
       }),
     }
   );
@@ -643,7 +643,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
       if (error) throw error;
 
       const counts: Record<string, number> = {};
-      for (const row of ((data ?? []) as unknown as Array<Record<string, unknown>>)) {
+      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
         const key = (row[col] as string) ?? "Unknown";
         counts[key] = (counts[key] ?? 0) + 1;
       }
