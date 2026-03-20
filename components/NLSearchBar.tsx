@@ -643,7 +643,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
       if (error) throw error;
 
       const counts: Record<string, number> = {};
-      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+      for (const row of ((data ?? []) as unknown) as Array<Record<string, unknown>>) {
         const key = (row[col] as string) ?? "Unknown";
         counts[key] = (counts[key] ?? 0) + 1;
       }
