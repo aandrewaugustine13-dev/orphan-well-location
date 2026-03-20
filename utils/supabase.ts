@@ -32,15 +32,30 @@ export interface Well {
 
 export type ColorMode = "proximity" | "age";
 
+// Wells in these states with no date are assumed pre-1950 (predating modern
+// well construction standards and documentation requirements).
+const APPALACHIAN_STATES = new Set([
+  "West Virginia", "Pennsylvania", "Ohio", "Kentucky",
+]);
+
 export function getWellAgeYears(well: Well): number | null {
-  if (!well.spud_date) return null;
+  if (!well.spud_date) {
+    // Appalachian wells with no date are assumed very old (pre-1950 → ~75+ yr)
+    if (well.state && APPALACHIAN_STATES.has(well.state)) return 100;
+    return null;
+  }
   const spud = new Date(well.spud_date);
   if (isNaN(spud.getTime())) return null;
   const years = (Date.now() - spud.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
   return Math.round(years * 10) / 10;
 }
 
+export function isAgeEstimated(well: Well): boolean {
+  return !well.spud_date && !!well.state && APPALACHIAN_STATES.has(well.state);
+}
+
 export function formatWellAge(well: Well): string {
+  if (isAgeEstimated(well)) return "est. pre-1950";
   const years = getWellAgeYears(well);
   if (years == null) return "Unknown";
   if (years < 1) return "<1 yr";
