@@ -75,6 +75,20 @@ interface GeneralStatsAction {
   state: string;
   county?: string | null;
 }
+interface EpaSitesNearAction {
+  action: "epa_sites_near";
+  state: string;
+  county?: string | null;
+  site_type?: "Superfund" | "Brownfield" | "TRI" | null;
+  max_distance_miles: number;
+  limit: number;
+}
+interface CombinedRiskAction {
+  action: "combined_risk";
+  state: string;
+  county?: string | null;
+  max_distance_miles: number;
+}
 interface MoveMapAction {
   action: "move_map";
   state: string;
@@ -91,11 +105,13 @@ type AnalyticsAction =
   | OperatorSummaryAction
   | GroupCountAction
   | GeneralStatsAction
+  | EpaSitesNearAction
+  | CombinedRiskAction
   | MoveMapAction;
 
 // ── System prompt for the planning call ──────────────────────────────────────
 
-const ANALYTICS_SYSTEM_PROMPT = `You are an analytics planner for a US orphan well database. Read the user's natural language question and return a single JSON object describing what analytics to run.
+const ANALYTICS_SYSTEM_PROMPT = `You are an analytics planner for a US multi-hazard environmental risk database. Read the user's natural language question and return a single JSON object describing what analytics to run.
 
 CRITICAL: Return ONLY raw JSON. No markdown. No backticks. No explanation. No extra text.
 
@@ -129,6 +145,20 @@ Table: groundwater_wells  (domestic/municipal water wells)
 - status           text         — e.g. "Active", "Inactive"
 - year_constructed int4         — year built
 
+Table: epa_sites  (EPA-regulated contamination sites)
+- site_id          text PK      — unique identifier
+- site_name        text         — name of the site or facility
+- latitude         float8       — decimal latitude
+- longitude        float8       — decimal longitude
+- state            text         — full US state name
+- county           text         — county WITHOUT "County"
+- city             text         — city name
+- site_type        text         — "Superfund", "Brownfield", or "TRI"
+- status           text         — e.g. "Active", "Inactive", "Archived/Deleted"
+- contamination_type text       — type of contamination (if known)
+- federal_facility boolean      — whether it is a federal facility
+- npl_status       text         — NPL status e.g. "Current NPL", "Deleted from NPL"
+
 Supabase RPCs available:
 - get_wells_in_radius(user_lng, user_lat, radius_meters)            → orphan wells within radius
 - get_groundwater_wells_in_radius(user_lng, user_lat, radius_meters) → groundwater wells within radius
@@ -161,6 +191,13 @@ group_by must be one of: "county", "operator", "well_type", "well_status"
 general_stats — overall statistics for a state or county
 {"action":"general_stats","state":"Ohio","county":"Cuyahoga"}
 
+epa_sites_near — count or list EPA contamination sites near a location
+{"action":"epa_sites_near","state":"Texas","county":"Harris","site_type":"Superfund","max_distance_miles":5,"limit":10}
+site_type must be one of: "Superfund", "Brownfield", "TRI", or null for all types
+
+combined_risk — show both orphan wells AND EPA sites near a location for a combined environmental risk view
+{"action":"combined_risk","state":"West Virginia","county":"Kanawha","max_distance_miles":3}
+
 move_map — just navigate the map to a location with no analytics
 {"action":"move_map","state":"Colorado","county":"Weld","radius_miles":5}
 
@@ -180,6 +217,8 @@ move_map — just navigate the map to a location with no analytics
 - "show me" / "take me to" / "where are" / simple map navigation → move_map
 - "stats" / "overview" / "summary of the problem" → general_stats
 - Age filters: "older than X years" → min_age_years=X; "newer than X years" → max_age_years=X
+- "superfund" / "brownfield" / "EPA sites" / "contamination sites" / "toxic" / "TRI" → epa_sites_near
+- "combined risk" / "all environmental hazards" / "total risk" / "everything near" → combined_risk
 
 === EXAMPLES ===
 "how many orphan wells are in Kanawha County West Virginia"
@@ -220,6 +259,24 @@ move_map — just navigate the map to a location with no analytics
 
 "overview of the orphan well problem in Wyoming"
 → {"action":"general_stats","state":"Wyoming","county":null}
+
+"how many superfund sites are near Kanawha County West Virginia"
+→ {"action":"epa_sites_near","state":"West Virginia","county":"Kanawha","site_type":"Superfund","max_distance_miles":10,"limit":10}
+
+"brownfield sites in Houston Texas"
+→ {"action":"epa_sites_near","state":"Texas","county":"Harris","site_type":"Brownfield","max_distance_miles":20,"limit":10}
+
+"TRI toxic release facilities in Ohio"
+→ {"action":"epa_sites_near","state":"Ohio","county":null,"site_type":"TRI","max_distance_miles":50,"limit":10}
+
+"all EPA contamination sites near me in Pennsylvania"
+→ {"action":"epa_sites_near","state":"Pennsylvania","county":null,"site_type":null,"max_distance_miles":25,"limit":10}
+
+"combined environmental risk in Kanawha County West Virginia"
+→ {"action":"combined_risk","state":"West Virginia","county":"Kanawha","max_distance_miles":5}
+
+"all environmental hazards near Reeves County Texas"
+→ {"action":"combined_risk","state":"Texas","county":"Reeves","max_distance_miles":10}
 
 "show orphan wells in Reeves County Texas"
 → {"action":"move_map","state":"Texas","county":"Reeves","radius_miles":5}`;
@@ -643,7 +700,7 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
       if (error) throw error;
 
       const counts: Record<string, number> = {};
-      for (const row of ((data ?? []) as unknown) as Array<Record<string, unknown>>) {
+      for (const row of (data as unknown as Array<Record<string, unknown>>) ?? []) {
         const key = (row[col] as string) ?? "Unknown";
         counts[key] = (counts[key] ?? 0) + 1;
       }
@@ -731,6 +788,104 @@ async function executeAction(action: AnalyticsAction): Promise<ActionResult> {
         },
         center,
         radiusMiles: defaultRadius,
+      };
+    }
+
+    case "epa_sites_near": {
+      const maxDist = action.max_distance_miles ?? 10;
+      const searchRadiusMeters = maxDist * MILES_TO_METERS;
+
+      let q = supabase
+        .from("epa_sites")
+        .select("site_id, site_name, site_type, status, npl_status, county, city, federal_facility")
+        .ilike("state", action.state);
+      if (action.county) q = q.ilike("county", action.county);
+      if (action.site_type) q = q.eq("site_type", action.site_type);
+      const { data, error } = await q.limit(action.limit ?? 10);
+      if (error) throw error;
+
+      const byType: Record<string, number> = {};
+      for (const row of (data ?? []) as Array<Record<string, unknown>>) {
+        const t = (row.site_type as string) ?? "Unknown";
+        byType[t] = (byType[t] ?? 0) + 1;
+      }
+
+      return {
+        results: {
+          location: action.county ? `${action.county} County, ${action.state}` : action.state,
+          site_type_filter: action.site_type ?? "All",
+          max_distance_miles: maxDist,
+          total_sites: data?.length ?? 0,
+          by_type: byType,
+          sites: (data ?? []).slice(0, action.limit ?? 10),
+        },
+        center,
+        radiusMiles: Math.max(maxDist * 2, defaultRadius),
+      };
+    }
+
+    case "combined_risk": {
+      const maxDist = action.max_distance_miles ?? 5;
+      const searchRadiusMeters = Math.max(maxDist * 10, 50) * MILES_TO_METERS;
+
+      const [orphanRes, epaRes, gwRes] = await Promise.all([
+        supabase.rpc("get_wells_in_radius", {
+          user_lng: center.lng,
+          user_lat: center.lat,
+          radius_meters: searchRadiusMeters,
+        }),
+        supabase.rpc("get_epa_sites_in_radius", {
+          user_lng: center.lng,
+          user_lat: center.lat,
+          radius_meters: searchRadiusMeters,
+        }),
+        supabase.rpc("get_groundwater_wells_in_radius", {
+          user_lng: center.lng,
+          user_lat: center.lat,
+          radius_meters: searchRadiusMeters,
+        }),
+      ]);
+
+      if (orphanRes.error) throw orphanRes.error;
+      // EPA or groundwater errors are non-fatal — log and continue
+      if (epaRes.error) console.error("EPA sites RPC error:", epaRes.error);
+      if (gwRes.error) console.error("Groundwater RPC error:", gwRes.error);
+
+      const orphans = (orphanRes.data ?? []) as Array<Record<string, unknown>>;
+      const epaSites = (epaRes.data ?? []) as Array<Record<string, unknown>>;
+      const groundwater = (gwRes.data ?? []) as Array<Record<string, unknown>>;
+
+      const epaByType: Record<string, number> = {};
+      for (const s of epaSites) {
+        const t = (s.site_type as string) ?? "Unknown";
+        epaByType[t] = (epaByType[t] ?? 0) + 1;
+      }
+
+      const superfundCount = epaByType["Superfund"] ?? 0;
+      const riskLevel =
+        orphans.length > 50 && superfundCount > 0
+          ? "CRITICAL"
+          : orphans.length > 20 || superfundCount > 0
+          ? "HIGH"
+          : orphans.length > 5 || (epaByType["Brownfield"] ?? 0) > 5
+          ? "MODERATE"
+          : "LOW";
+
+      return {
+        results: {
+          location: action.county ? `${action.county} County, ${action.state}` : action.state,
+          search_radius_miles: searchRadiusMeters / MILES_TO_METERS,
+          risk_level: riskLevel,
+          orphan_wells: orphans.length,
+          groundwater_wells: groundwater.length,
+          epa_sites: epaSites.length,
+          epa_by_type: epaByType,
+          superfund_sites: superfundCount,
+          brownfield_sites: epaByType["Brownfield"] ?? 0,
+          tri_facilities: epaByType["TRI"] ?? 0,
+        },
+        center,
+        radiusMiles: Math.max(maxDist * 3, defaultRadius),
       };
     }
   }

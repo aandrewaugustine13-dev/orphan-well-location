@@ -61,6 +61,21 @@ interface GroundwaterWell {
   miles_away?: number;
 }
 
+interface EpaSite {
+  site_id: string;
+  site_name: string;
+  latitude: number;
+  longitude: number;
+  state: string;
+  county: string;
+  city: string;
+  site_type: string;
+  status: string;
+  contamination_type: string | null;
+  federal_facility: boolean;
+  npl_status: string | null;
+}
+
 const DEFAULT_CENTER: [number, number] = [39.8, -98.5];
 const DEFAULT_ZOOM = 5;
 const FETCH_DEBOUNCE_MS = 400;
@@ -137,10 +152,13 @@ export default function Map({
   const [wells, setWells] = useState<Well[]>([]);
   const [groundwaterWells, setGroundwaterWells] = useState<GroundwaterWell[]>([]);
   const [showGroundwater, setShowGroundwater] = useState(false);
+  const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
+  const [showEpaSites, setShowEpaSites] = useState(false);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const gwRequestIdRef = useRef(0);
+  const epaRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
 
   const handleMoveEnd = useCallback(
@@ -287,6 +305,40 @@ export default function Map({
     loadGroundwater();
   }, [queryBounds, showGroundwater, searchedLocation]);
 
+  // Fetch EPA sites within the current viewport bounds
+  useEffect(() => {
+    if (!showEpaSites || !queryBounds) {
+      setEpaSites([]);
+      return;
+    }
+
+    const requestId = ++epaRequestIdRef.current;
+    const bounds = queryBounds;
+
+    async function loadEpaSites() {
+      if (!supabase) return;
+
+      const { data, error } = await supabase
+        .from("epa_sites")
+        .select("*")
+        .gte("latitude", bounds.minLat)
+        .lte("latitude", bounds.maxLat)
+        .gte("longitude", bounds.minLng)
+        .lte("longitude", bounds.maxLng)
+        .limit(2000);
+
+      if (requestId !== epaRequestIdRef.current) return;
+      if (error) {
+        console.error("Error fetching EPA sites:", error);
+        return;
+      }
+
+      setEpaSites((data as EpaSite[]) ?? []);
+    }
+
+    loadEpaSites();
+  }, [queryBounds, showEpaSites]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <MapContainer
@@ -372,9 +424,52 @@ export default function Map({
               </Popup>
             </CircleMarker>
           ))}
+
+        {showEpaSites &&
+          epaSites.map((site) => {
+            const color =
+              site.site_type === "Superfund"
+                ? "#f97316"   // orange — most hazardous
+                : site.site_type === "TRI"
+                ? "#a855f7"   // purple — industrial releases
+                : "#eab308";  // yellow — brownfields
+            return (
+              <CircleMarker
+                key={site.site_id}
+                center={[site.latitude, site.longitude]}
+                radius={site.site_type === "Superfund" ? 7 : 5}
+                pathOptions={{
+                  color,
+                  fillColor: color,
+                  fillOpacity: 0.75,
+                  weight: site.site_type === "Superfund" ? 2 : 1,
+                }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 220 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 4 }}>
+                      {site.site_name || site.site_id}
+                    </div>
+                    <div style={{ fontSize: "0.85em", marginBottom: 4, color: "#666" }}>
+                      {site.site_type}
+                      {site.federal_facility ? " · Federal Facility" : ""}
+                    </div>
+                    {site.city && site.county && (
+                      <div>{site.city}, {site.county} Co., {site.state}</div>
+                    )}
+                    <div>Status: {site.status}</div>
+                    {site.npl_status && <div>NPL: {site.npl_status}</div>}
+                    {site.contamination_type && (
+                      <div>Contamination: {site.contamination_type}</div>
+                    )}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            );
+          })}
       </MapContainer>
 
-      <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000 }}>
+      <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000, display: "flex", flexDirection: "column", gap: "6px" }}>
         <button
           onClick={() => setShowGroundwater((v) => !v)}
           className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
@@ -384,6 +479,16 @@ export default function Map({
           }`}
         >
           {showGroundwater ? "Hide Groundwater Wells" : "Show Groundwater Wells"}
+        </button>
+        <button
+          onClick={() => setShowEpaSites((v) => !v)}
+          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
+            showEpaSites
+              ? "bg-orange-500 text-white hover:bg-orange-600"
+              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+          }`}
+        >
+          {showEpaSites ? "Hide EPA Sites" : "Show EPA Sites"}
         </button>
       </div>
     </div>
