@@ -522,37 +522,34 @@ export default function Map({
           })}
       </MapContainer>
 
-      <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000, display: "flex", flexDirection: "column", gap: "6px" }}>
-        <button
-          onClick={() => setShowGroundwater((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showGroundwater
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showGroundwater ? "Hide Groundwater Wells" : "Show Groundwater Wells"}
-        </button>
-        <button
-          onClick={() => setShowEpaSites((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showEpaSites
-              ? "bg-orange-500 text-white hover:bg-orange-600"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showEpaSites ? "Hide EPA Sites" : "Show EPA Sites"}
-        </button>
-        <button
-          onClick={() => setShowFloodZones((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showFloodZones
-              ? "bg-cyan-600 text-white hover:bg-cyan-700"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showFloodZones ? "Hide Flood Zones" : "Show Flood Zones"}
-        </button>
+      <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000, display: "flex", flexDirection: "column", gap: "4px" }}>
+        {(
+          [
+            { label: "GROUNDWATER WELLS", active: showGroundwater, color: "#3b82f6", toggle: () => setShowGroundwater((v) => !v) },
+            { label: "EPA SITES",         active: showEpaSites,    color: "#f97316", toggle: () => setShowEpaSites((v) => !v) },
+            { label: "FLOOD ZONES",       active: showFloodZones,  color: "#22d3ee", toggle: () => setShowFloodZones((v) => !v) },
+          ] as const
+        ).map(({ label, active, color, toggle }) => (
+          <button
+            key={label}
+            onClick={toggle}
+            style={{
+              padding: "5px 10px",
+              fontSize: "9px",
+              fontWeight: 500,
+              letterSpacing: "0.12em",
+              color: active ? color : "#555",
+              background: "#111",
+              border: active ? `1px solid ${color}` : "1px solid #333",
+              cursor: "pointer",
+              fontFamily: "var(--font-mono)",
+              whiteSpace: "nowrap",
+              textAlign: "left",
+            }}
+          >
+            {active ? "HIDE" : "SHOW"} {label}
+          </button>
+        ))}
       </div>
     </div>
   );
