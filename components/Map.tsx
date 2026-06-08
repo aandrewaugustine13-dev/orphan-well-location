@@ -39,6 +39,7 @@ interface MapProps {
   searchLocation: { lat: number; lng: number; zoom?: number } | null;
   searchedLocation: { lat: number; lng: number } | null;
   searchedLabel: string | null;
+  showOrphanWells: boolean;
   showGroundwater: boolean;
   showEpaSites: boolean;
   showFloodZones: boolean;
@@ -198,6 +199,7 @@ export default function Map({
   searchLocation,
   searchedLocation,
   searchedLabel,
+  showOrphanWells,
   showGroundwater,
   showEpaSites,
   showFloodZones,
@@ -409,41 +411,42 @@ export default function Map({
 
         <MapController programmaticMove={programmaticMove} onMoveEnd={handleMoveEnd} />
 
-        {wells.map((well) => {
-          const isSelected = selectedWellApi === well.api_number;
-          const color = getWellColor(well, colorMode);
+        {showOrphanWells &&
+          wells.map((well) => {
+            const isSelected = selectedWellApi === well.api_number;
+            const color = getWellColor(well, colorMode);
 
-          return (
-            <CircleMarker
-              key={well.api_number}
-              center={[well.latitude, well.longitude]}
-              radius={getWellAgeRadius(well, isSelected)}
-              pathOptions={{
-                color,
-                fillColor: color,
-                fillOpacity: isSelected ? 0.9 : 0.7,
-                weight: isSelected ? 2 : 1,
-              }}
-              eventHandlers={{
-                click: () => onSelectWell(isSelected ? null : well.api_number),
-              }}
-            >
-              <Popup>
-                <div style={{ minWidth: 220 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 6 }}>
-                    {well.well_name || well.api_number}
+            return (
+              <CircleMarker
+                key={well.api_number}
+                center={[well.latitude, well.longitude]}
+                radius={getWellAgeRadius(well, isSelected)}
+                pathOptions={{
+                  color,
+                  fillColor: color,
+                  fillOpacity: isSelected ? 0.9 : 0.7,
+                  weight: isSelected ? 2 : 1,
+                }}
+                eventHandlers={{
+                  click: () => onSelectWell(isSelected ? null : well.api_number),
+                }}
+              >
+                <Popup>
+                  <div style={{ minWidth: 220 }}>
+                    <div style={{ fontWeight: 700, marginBottom: 6 }}>
+                      {well.well_name || well.api_number}
+                    </div>
+                    <div>API: {well.api_number}</div>
+                    {well.miles_away != null && searchedLabel && (
+                      <div>{well.miles_away.toFixed(2)} mi from {searchedLabel}</div>
+                    )}
+                    <div>Age: {formatWellAge(well)}</div>
+                    <div>Liability: {formatLiability(well.liability_est)}</div>
                   </div>
-                  <div>API: {well.api_number}</div>
-                  {well.miles_away != null && searchedLabel && (
-                    <div>{well.miles_away.toFixed(2)} mi from {searchedLabel}</div>
-                  )}
-                  <div>Age: {formatWellAge(well)}</div>
-                  <div>Liability: {formatLiability(well.liability_est)}</div>
-                </div>
-              </Popup>
-            </CircleMarker>
-          );
-        })}
+                </Popup>
+              </CircleMarker>
+            );
+          })}
 
         {showGroundwater &&
           groundwaterWells.map((well) => (

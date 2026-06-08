@@ -29,6 +29,7 @@ export default function Home() {
   const [nlSummary, setNlSummary] = useState<string | null>(null);
 
   // Map layer toggle states
+  const [showOrphanWells, setShowOrphanWells] = useState(true);
   const [showGroundwater, setShowGroundwater] = useState(false);
   const [showEpaSites, setShowEpaSites] = useState(false);
   const [showFloodZones, setShowFloodZones] = useState(false);
@@ -48,6 +49,7 @@ export default function Home() {
     setColorMode(mode);
   }, [searchLocation]);
 
+  const handleToggleOrphanWells = useCallback(() => setShowOrphanWells((v) => !v), []);
   const handleToggleGroundwater = useCallback(() => setShowGroundwater((v) => !v), []);
   const handleToggleEpaSites = useCallback(() => setShowEpaSites((v) => !v), []);
   const handleToggleFloodZones = useCallback(() => setShowFloodZones((v) => !v), []);
@@ -152,6 +154,7 @@ export default function Home() {
           searchLocation={searchLocation}
           searchedLocation={searchLocation}
           searchedLabel={searchLocation?.label ?? null}
+          showOrphanWells={showOrphanWells}
           showGroundwater={showGroundwater}
           showEpaSites={showEpaSites}
           showFloodZones={showFloodZones}
@@ -228,6 +231,8 @@ export default function Home() {
             onSearchLocation={handleSearchLocation}
             searchedLocation={searchLocation}
             searchedLabel={searchLocation?.label ?? null}
+            showOrphanWells={showOrphanWells}
+            onToggleOrphanWells={handleToggleOrphanWells}
             showGroundwater={showGroundwater}
             onToggleGroundwater={handleToggleGroundwater}
             showEpaSites={showEpaSites}

@@ -26,6 +26,8 @@ interface SidebarProps {
   searchedLabel: string | null;
   
   // Layer states & toggles
+  showOrphanWells: boolean;
+  onToggleOrphanWells: () => void;
   showGroundwater: boolean;
   onToggleGroundwater: () => void;
   showEpaSites: boolean;
@@ -49,6 +51,8 @@ export default function Sidebar({
   onSearchLocation,
   searchedLocation,
   searchedLabel,
+  showOrphanWells,
+  onToggleOrphanWells,
   showGroundwater,
   onToggleGroundwater,
   showEpaSites,
@@ -213,6 +217,23 @@ export default function Sidebar({
           <div>
             <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">MAP LAYERS</div>
             <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">ORPHAN WELLS</span>
+                <button
+                  onClick={onToggleOrphanWells}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showOrphanWells ? 'bg-red-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showOrphanWells}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showOrphanWells ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono tracking-wider text-zinc-400">GROUNDWATER WELLS</span>
                 <button
