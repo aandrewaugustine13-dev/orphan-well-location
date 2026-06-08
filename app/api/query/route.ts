@@ -145,7 +145,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const radiusMeters = Math.round(parsed.radius_miles * MILES_TO_METERS);
+  const radiusMiles = typeof parsed.radius_miles === "number" && !isNaN(parsed.radius_miles) ? parsed.radius_miles : 5.0;
+  const radiusMeters = Math.round(radiusMiles * MILES_TO_METERS);
 
   // Step 3: Query Supabase
   const needsGroundwater =
