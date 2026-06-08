@@ -61,6 +61,13 @@ export default function Home() {
       zoom: radiusToZoom(result.radiusMiles),
     });
     setNlSummary(result.summary);
+
+    // Automatically enable corresponding map layers for the user
+    if (result.target_layer === "groundwater_wells") {
+      setShowGroundwater(true);
+    } else if (result.target_layer === "epa_sites") {
+      setShowEpaSites(true);
+    }
   }, []);
 
   return (

@@ -6,6 +6,7 @@ export interface NLResult {
   center: { lat: number; lng: number };
   radiusMiles: number;
   summary: string;
+  target_layer?: "orphan_wells" | "groundwater_wells" | "epa_sites";
 }
 
 interface NLSearchBarProps {
@@ -76,6 +77,7 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
         center: data.center,
         radiusMiles: data.radiusMiles,
         summary: data.summary,
+        target_layer: data.target_layer,
       });
     } catch (err) {
       const msg =

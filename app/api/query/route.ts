@@ -9,10 +9,12 @@ const SYSTEM_PROMPT = `You are a deterministic translation engine that converts 
 DATABASE TABLES AVAILABLE FOR POSTGIS EXECUTION:
 - wells: api_number (text), well_name (text), latitude (float8), longitude (float8), state (text), county (text), operator_name (text), well_type (text), well_status (text), spud_date (date), months_inactive (float8), liability_est (float8)
 - groundwater_wells: well_id (text), latitude (float8), longitude (float8), state (text), county (text), well_depth_ft (float8), well_capacity_gpm (float8), water_use (text), status (text), year_constructed (int4)
+- epa_sites: site_id (text), site_name (text), latitude (float8), longitude (float8), state (text), county (text), city (text), site_type (text), status (text), contamination_type (text), federal_facility (boolean), npl_status (text)
 
 POSTGIS RPC FUNCTIONS TARGETED:
 - get_wells_in_radius(user_lng, user_lat, radius_meters)
 - get_groundwater_wells_in_radius(user_lng, user_lat, radius_meters)
+- get_epa_sites_in_radius(user_lng, user_lat, radius_meters)
 
 OUTPUT FORMAT:
 You must output a single, flat JSON object containing EXACTLY these keys. Do not generate markdown backticks, explanations, or any other surrounding text.
@@ -22,7 +24,8 @@ JSON Schema:
   "state": "Full US state name (e.g. 'Texas', 'Ohio')",
   "county": "County name without 'County' suffix (e.g. 'Reeves', 'Cuyahoga')",
   "radius_miles": 5.0, // Default strictly to 5.0 if not specified in input
-  "query_type": "one of: 'orphan_near_groundwater' | 'nearest_orphan_to_groundwater' | 'orphan_count' | 'general'"
+  "query_type": "one of: 'orphan_near_groundwater' | 'nearest_orphan_to_groundwater' | 'orphan_count' | 'general'", // Note: 'orphan_count' represents the count_wells action, which counts features of the specified target_layer (orphan wells, groundwater wells, or epa sites).
+  "target_layer": "one of: 'orphan_wells' | 'groundwater_wells' | 'epa_sites'" // Must be strictly specified based on the user request
 }
 
 CRITICAL RULES:
@@ -35,6 +38,7 @@ interface ParsedQuery {
   county: string;
   radius_miles: number;
   query_type: "orphan_near_groundwater" | "nearest_orphan_to_groundwater" | "orphan_count" | "general";
+  target_layer: "orphan_wells" | "groundwater_wells" | "epa_sites";
 }
 
 function extractJson(rawText: string): string {
@@ -117,8 +121,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `JSON parse failed: ${err.message}. Cleaned payload: ${cleanedText}` }, { status: 400 });
     }
 
-    if (!parsed.state || !parsed.county || !parsed.query_type) {
-      return NextResponse.json({ error: "Validation error: Missing required fields ('state', 'county', or 'query_type') in parsed payload." }, { status: 400 });
+    if (!parsed.state || !parsed.county || !parsed.query_type || !parsed.target_layer) {
+      return NextResponse.json({ error: "Validation error: Missing required fields ('state', 'county', 'query_type', or 'target_layer') in parsed payload." }, { status: 400 });
     }
   } catch (err: any) {
     return NextResponse.json({ error: `API route handler error: ${err.message}` }, { status: 500 });
@@ -179,21 +183,25 @@ export async function POST(req: NextRequest) {
   const radiusMeters = Math.round(radiusMiles * MILES_TO_METERS);
 
   // Step 3: Query Supabase
-  const needsGroundwater =
-    parsed.query_type === "orphan_near_groundwater" ||
-    parsed.query_type === "nearest_orphan_to_groundwater";
+  const targetLayer = parsed.target_layer || "orphan_wells";
+  const needsOrphan = targetLayer === "orphan_wells" || parsed.query_type === "orphan_near_groundwater" || parsed.query_type === "nearest_orphan_to_groundwater";
+  const needsGroundwater = targetLayer === "groundwater_wells" || parsed.query_type === "orphan_near_groundwater" || parsed.query_type === "nearest_orphan_to_groundwater";
+  const needsEpa = targetLayer === "epa_sites";
 
   let orphanWells: WellRow[] = [];
   let groundwaterWells: WellRow[] = [];
+  let epaSites: any[] = [];
 
   try {
-    const { data: orphanData, error: orphanErr } = await supabase.rpc("get_wells_in_radius", {
-      user_lng: center.lng,
-      user_lat: center.lat,
-      radius_meters: radiusMeters,
-    });
-    if (orphanErr) throw orphanErr;
-    orphanWells = orphanData ?? [];
+    if (needsOrphan) {
+      const { data: orphanData, error: orphanErr } = await supabase.rpc("get_wells_in_radius", {
+        user_lng: center.lng,
+        user_lat: center.lat,
+        radius_meters: radiusMeters,
+      });
+      if (orphanErr) throw orphanErr;
+      orphanWells = orphanData ?? [];
+    }
 
     if (needsGroundwater) {
       const { data: gwData, error: gwErr } = await supabase.rpc("get_groundwater_wells_in_radius", {
@@ -204,8 +212,18 @@ export async function POST(req: NextRequest) {
       if (gwErr) throw gwErr;
       groundwaterWells = gwData ?? [];
     }
-  } catch {
-    return NextResponse.json({ error: "Database query failed" }, { status: 500 });
+
+    if (needsEpa) {
+      const { data: epaData, error: epaErr } = await supabase.rpc("get_epa_sites_in_radius", {
+        user_lng: center.lng,
+        user_lat: center.lat,
+        radius_meters: radiusMeters,
+      });
+      if (epaErr) throw epaErr;
+      epaSites = epaData ?? [];
+    }
+  } catch (err: any) {
+    return NextResponse.json({ error: `Database query failed: ${err.message}` }, { status: 500 });
   }
 
   // Step 4: Cross-proximity computation
@@ -246,19 +264,33 @@ export async function POST(req: NextRequest) {
         : `No orphan wells found near domestic water wells in ${county} County, ${state}.`;
       break;
     case "orphan_count":
-      summary = `Found ${orphanWells.length} orphan well${orphanWells.length !== 1 ? "s" : ""} within ${radius_miles} miles in ${county} County, ${state}.`;
+      if (targetLayer === "groundwater_wells") {
+        summary = `Found ${groundwaterWells.length} groundwater well${groundwaterWells.length !== 1 ? "s" : ""} within ${radius_miles} miles in ${county} County, ${state}.`;
+      } else if (targetLayer === "epa_sites") {
+        summary = `Found ${epaSites.length} EPA contamination site${epaSites.length !== 1 ? "s" : ""} within ${radius_miles} miles in ${county} County, ${state}.`;
+      } else {
+        summary = `Found ${orphanWells.length} orphan well${orphanWells.length !== 1 ? "s" : ""} within ${radius_miles} miles in ${county} County, ${state}.`;
+      }
       break;
     default:
-      summary = `Showing ${orphanWells.length} orphan well${orphanWells.length !== 1 ? "s" : ""} near ${county} County, ${state}.`;
+      if (targetLayer === "groundwater_wells") {
+        summary = `Showing ${groundwaterWells.length} groundwater well${groundwaterWells.length !== 1 ? "s" : ""} near ${county} County, ${state}.`;
+      } else if (targetLayer === "epa_sites") {
+        summary = `Showing ${epaSites.length} EPA contamination site${epaSites.length !== 1 ? "s" : ""} near ${county} County, ${state}.`;
+      } else {
+        summary = `Showing ${orphanWells.length} orphan well${orphanWells.length !== 1 ? "s" : ""} near ${county} County, ${state}.`;
+      }
   }
 
   return NextResponse.json({
     center,
     radiusMiles: radius_miles,
     summary,
+    target_layer: targetLayer,
     stats: {
       orphanCount: orphanWells.length,
       groundwaterCount: groundwaterWells.length,
+      epaCount: epaSites.length,
       nearbyOrphanCount,
       nearestDistanceMiles,
     },
