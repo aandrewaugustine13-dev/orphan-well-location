@@ -78,20 +78,16 @@ export default function AddressSearch({ onSelect }: AddressSearchProps) {
 
       if (ZIP_REGEX.test(trimmed)) {
         data = await fetchJson(
-          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&postalcode=${trimmed}&limit=5`
+          `/api/geocode?postalcode=${trimmed}`
         );
         if (!data.length) {
           data = await fetchJson(
-            `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(
-              `${trimmed}, United States`
-            )}`
+            `/api/geocode?q=${encodeURIComponent(`${trimmed}, United States`)}`
           );
         }
       } else {
         data = await fetchJson(
-          `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=5&q=${encodeURIComponent(
-            trimmed
-          )}`
+          `/api/geocode?q=${encodeURIComponent(trimmed)}`
         );
       }
 

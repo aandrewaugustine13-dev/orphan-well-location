@@ -298,10 +298,7 @@ function haversineDistanceMiles(
 
 async function geocodeLocation(state: string, county?: string | null): Promise<{ lat: number; lng: number }> {
   const q = county ? `${county} County, ${state}, USA` : `${state}, USA`;
-  const res = await fetch(
-    `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(q)}`,
-    { headers: { "Accept-Language": "en", "User-Agent": "OrphanWellLocator/1.0" } }
-  );
+  const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
   const data = await res.json();
   if (!data.length) throw new Error(`Could not geocode: ${q}`);
   return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };

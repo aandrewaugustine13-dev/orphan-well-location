@@ -6,33 +6,30 @@ const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 const MILES_TO_METERS = 1609.34;
 
-const SYSTEM_PROMPT = `You parse natural language queries about oil and gas wells into structured JSON.
+const SYSTEM_PROMPT = `You are a deterministic translation engine that converts natural language environmental queries into a strict, parameterized JSON payload for PostGIS query execution.
 
-Database tables:
-- wells: api_number, well_name, latitude, longitude, state, county, operator_name,
-  well_type, well_status, spud_date, months_inactive, liability_est
-- groundwater_wells: well_id, latitude, longitude, state, county, well_depth_ft,
-  well_capacity_gpm, water_use, status, year_constructed
+DATABASE TABLES AVAILABLE FOR POSTGIS EXECUTION:
+- wells: api_number (text), well_name (text), latitude (float8), longitude (float8), state (text), county (text), operator_name (text), well_type (text), well_status (text), spud_date (date), months_inactive (float8), liability_est (float8)
+- groundwater_wells: well_id (text), latitude (float8), longitude (float8), state (text), county (text), well_depth_ft (float8), well_capacity_gpm (float8), water_use (text), status (text), year_constructed (int4)
 
-RPC functions (called by the server, not you):
+POSTGIS RPC FUNCTIONS TARGETED:
 - get_wells_in_radius(user_lng, user_lat, radius_meters)
 - get_groundwater_wells_in_radius(user_lng, user_lat, radius_meters)
 
-Respond ONLY with valid JSON, no other text:
+OUTPUT FORMAT:
+You must output a single, flat JSON object containing EXACTLY these keys. Do not generate markdown backticks, explanations, or any other surrounding text.
+
+JSON Schema:
 {
-  "state": "Ohio",
-  "county": "Cuyahoga",
-  "radius_miles": 3,
-  "query_type": "orphan_near_groundwater"
+  "state": "Full US state name (e.g. 'Texas', 'Ohio')",
+  "county": "County name without 'County' suffix (e.g. 'Reeves', 'Cuyahoga')",
+  "radius_miles": 5.0, // Default strictly to 5.0 if not specified in input
+  "query_type": "one of: 'orphan_near_groundwater' | 'nearest_orphan_to_groundwater' | 'orphan_count' | 'general'"
 }
 
-query_type must be one of:
-- "orphan_near_groundwater" — find orphan wells near domestic water wells
-- "nearest_orphan_to_groundwater" — find the single closest orphan well to any water well
-- "orphan_count" — count orphan wells in area
-- "general" — general area query
-
-Default radius_miles to 5 if unspecified. Strip "County" from county name.`;
+CRITICAL RULES:
+1. Strip "County" or "Co." from the county name.
+2. Only output the raw JSON. No markdown code blocks, no trailing comments.`;
 
 interface ParsedQuery {
   state: string;
@@ -79,7 +76,7 @@ export async function POST(req: NextRequest) {
   let parsed: ParsedQuery;
   try {
     const msg = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
+      model: "claude-sonnet-4-6",
       max_tokens: 256,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: query }],
@@ -101,7 +98,10 @@ export async function POST(req: NextRequest) {
   try {
     const geoRes = await fetch(
       `https://nominatim.openstreetmap.org/search?format=json&countrycodes=us&limit=1&q=${encodeURIComponent(geoQuery)}`,
-      { headers: { "Accept-Language": "en", "User-Agent": "OrphanWellLocator/1.0" } }
+      {
+        headers: { "Accept-Language": "en", "User-Agent": "OrphanWellLocator/1.0" },
+        cache: "force-cache",
+      }
     );
     const geoData = await geoRes.json();
     if (!geoData.length) throw new Error("Not found");
