@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Step 2: Geocode county + state via Nominatim
-  const geoQuery = `${parsed.county} County, ${parsed.state}`;
+  const geoQuery = parsed.county ? `${parsed.county} County, ${parsed.state}, USA` : `${parsed.state}, USA`;
   let center: { lat: number; lng: number };
   try {
     const geoRes = await fetch(
@@ -135,13 +135,43 @@ export async function POST(req: NextRequest) {
         cache: "force-cache",
       }
     );
+
+    if (!geoRes.ok) {
+      return NextResponse.json(
+        { error: `Geocoding request failed: ${geoRes.status} ${geoRes.statusText}` },
+        { status: 502 }
+      );
+    }
+
     const geoData = await geoRes.json();
-    if (!geoData.length) throw new Error("Not found");
-    center = { lat: parseFloat(geoData[0].lat), lng: parseFloat(geoData[0].lon) };
-  } catch {
+    if (!geoData || !geoData.length) {
+      return NextResponse.json(
+        { error: `Could not resolve coordinates for query: "${geoQuery}"` },
+        { status: 404 }
+      );
+    }
+
+    const lat = parseFloat(geoData[0].lat);
+    const lng = parseFloat(geoData[0].lon);
+    if (isNaN(lat) || isNaN(lng) || (lat === 0 && lng === 0)) {
+      return NextResponse.json(
+        { error: "Geocoder resolved invalid coordinates (NaN or 0,0)" },
+        { status: 422 }
+      );
+    }
+    center = { lat, lng };
+  } catch (err: any) {
     return NextResponse.json(
-      { error: `Could not locate ${parsed.county}, ${parsed.state}` },
-      { status: 422 }
+      { error: `Geocoding network error: ${err.message}` },
+      { status: 500 }
+    );
+  }
+
+  // Explicit safety check on coordinates before Supabase RPC call
+  if (!center || isNaN(center.lat) || isNaN(center.lng) || (center.lat === 0 && center.lng === 0)) {
+    return NextResponse.json(
+      { error: "Pre-query validation failed: Invalid resolved search coordinates." },
+      { status: 400 }
     );
   }
 
