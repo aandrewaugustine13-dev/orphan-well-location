@@ -38,12 +38,16 @@ interface ParsedQuery {
 }
 
 function extractJson(rawText: string): string {
-  const startIdx = rawText.indexOf("{");
-  const endIdx = rawText.lastIndexOf("}");
-  if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
-    throw new Error("No JSON object found in response");
+  const match = rawText.match(/\{[\s\S]*\}/);
+  if (!match) {
+    throw new Error("No JSON object structure found in response");
   }
-  return rawText.substring(startIdx, endIdx + 1).trim();
+  let jsonContent = match[0];
+  // Strip trailing commas before closing braces and brackets
+  jsonContent = jsonContent
+    .replace(/,\s*\}/g, "}")
+    .replace(/,\s*\]/g, "]");
+  return jsonContent.trim();
 }
 
 interface WellRow {
@@ -97,15 +101,27 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "user", content: query }],
     });
 
-    const text = msg.content.find((c) => c.type === "text")?.text ?? "";
-    const cleanedText = extractJson(text);
-    parsed = JSON.parse(cleanedText);
+    const rawText = msg.content[0].type === "text" ? msg.content[0].text : "";
+    console.log("Raw LLM Output:", rawText);
+
+    let cleanedText = "";
+    try {
+      cleanedText = extractJson(rawText);
+    } catch (err: any) {
+      return NextResponse.json({ error: `JSON boundaries not found: ${err.message}` }, { status: 400 });
+    }
+
+    try {
+      parsed = JSON.parse(cleanedText);
+    } catch (err: any) {
+      return NextResponse.json({ error: `JSON parse failed: ${err.message}. Cleaned payload: ${cleanedText}` }, { status: 400 });
+    }
 
     if (!parsed.state || !parsed.county || !parsed.query_type) {
-      throw new Error("Missing required fields");
+      return NextResponse.json({ error: "Validation error: Missing required fields ('state', 'county', or 'query_type') in parsed payload." }, { status: 400 });
     }
-  } catch {
-    return NextResponse.json({ error: "Could not parse query" }, { status: 400 });
+  } catch (err: any) {
+    return NextResponse.json({ error: `API route handler error: ${err.message}` }, { status: 500 });
   }
 
   // Step 2: Geocode county + state via Nominatim
