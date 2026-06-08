@@ -97,29 +97,10 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
   const keyIsSet = !!anthropicKey;
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        top: "48px",
-        left: "50%",
-        transform: "translateX(-50%)",
-        width: "min(520px, calc(100vw - 48px))",
-        zIndex: 800,
-        fontFamily: "var(--font-mono)",
-      }}
-    >
+    <div className="w-full font-mono flex flex-col mt-1">
       {/* Search bar */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          background: "#111",
-          border: "1px solid #444",
-          padding: "0 10px",
-          gap: "8px",
-        }}
-      >
-        <span style={{ color: "#555", fontSize: "11px", flexShrink: 0 }}>&gt;</span>
+      <div className="flex items-center bg-zinc-900 border border-zinc-800 px-3 py-1.5 gap-2 rounded-sm">
+        <span className="text-zinc-600 text-xs flex-shrink-0">&gt;</span>
 
         <input
           ref={inputRef}
@@ -130,39 +111,18 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
             setError(null);
           }}
           onKeyDown={handleKeyDown}
-          placeholder="query wells — count, liability, risk, location..."
+          placeholder="AI natural language search..."
           disabled={loading}
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "none",
-            outline: "none",
-            color: "#e0e0e0",
-            fontSize: "11px",
-            fontFamily: "var(--font-mono)",
-            padding: "10px 0",
-            opacity: loading ? 0.5 : 1,
-            letterSpacing: "0.02em",
-          }}
+          className="flex-1 bg-transparent border-none outline-none text-zinc-200 text-xs font-mono py-1 opacity-100 disabled:opacity-50 tracking-wide"
         />
 
         {/* API key button */}
         <button
           onClick={openKeyPopover}
           title={keyIsSet ? "Anthropic API key configured" : "Set Anthropic API key"}
-          style={{
-            background: "none",
-            border: "none",
-            cursor: "pointer",
-            padding: "2px",
-            display: "flex",
-            alignItems: "center",
-            flexShrink: 0,
-            color: keyIsSet ? "#d4a017" : "#444",
-            fontSize: "10px",
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.05em",
-          }}
+          className={`bg-none border-none cursor-pointer p-0.5 flex items-center flex-shrink-0 text-[10px] font-mono tracking-widest ${
+            keyIsSet ? "text-amber-500" : "text-zinc-600"
+          }`}
           aria-label="Configure Anthropic API key"
         >
           KEY
@@ -170,32 +130,11 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
 
         {/* Spinner or submit */}
         {loading ? (
-          <div
-            style={{
-              width: "10px",
-              height: "10px",
-              border: "1px solid #333",
-              borderTopColor: "#888",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-              flexShrink: 0,
-            }}
-          />
+          <div className="w-2.5 h-2.5 border border-zinc-800 border-t-zinc-400 rounded-full animate-spin flex-shrink-0" />
         ) : query.length > 0 ? (
           <button
             onClick={submit}
-            style={{
-              background: "none",
-              border: "none",
-              color: "#888",
-              cursor: "pointer",
-              padding: "2px",
-              display: "flex",
-              alignItems: "center",
-              flexShrink: 0,
-              fontSize: "14px",
-              fontFamily: "var(--font-mono)",
-            }}
+            className="bg-none border-none text-zinc-400 cursor-pointer p-0.5 flex items-center flex-shrink-0 text-sm font-mono"
             aria-label="Submit query"
           >
             ↵
@@ -205,26 +144,11 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
 
       {/* API key popover */}
       {keyPopoverOpen && (
-        <div
-          style={{
-            marginTop: "1px",
-            background: "#111",
-            border: "1px solid #444",
-            padding: "12px",
-          }}
-        >
-          <p
-            style={{
-              margin: "0 0 8px",
-              fontSize: "10px",
-              color: "#666",
-              lineHeight: 1.6,
-              letterSpacing: "0.03em",
-            }}
-          >
+        <div className="mt-1 bg-zinc-900 border border-zinc-800 p-3 flex flex-col rounded-sm">
+          <p className="margin-0 mb-2 text-[9px] text-zinc-500 leading-normal tracking-wide">
             ANTHROPIC API KEY — stored locally in your browser only
           </p>
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div className="flex gap-2">
             <input
               ref={keyInputRef}
               type="password"
@@ -235,43 +159,17 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
                 if (e.key === "Escape") setKeyPopoverOpen(false);
               }}
               placeholder="sk-ant-..."
-              style={{
-                flex: 1,
-                background: "#0a0a0a",
-                border: "1px solid #333",
-                color: "#e0e0e0",
-                fontSize: "11px",
-                fontFamily: "var(--font-mono)",
-                padding: "6px 8px",
-                outline: "none",
-              }}
+              className="flex-1 bg-zinc-950 border border-zinc-800 text-zinc-200 text-xs font-mono px-2 py-1 outline-none rounded-sm"
             />
             <button
               onClick={saveKey}
-              style={{
-                background: "none",
-                border: "1px solid #888",
-                color: "#e0e0e0",
-                cursor: "pointer",
-                fontSize: "10px",
-                padding: "6px 12px",
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.08em",
-              }}
+              className="bg-none border border-zinc-700 hover:border-zinc-500 text-zinc-200 cursor-pointer text-[10px] px-3 py-1 font-mono tracking-wider rounded-sm"
             >
               SAVE
             </button>
             <button
               onClick={() => setKeyPopoverOpen(false)}
-              style={{
-                background: "none",
-                border: "1px solid #333",
-                color: "#555",
-                cursor: "pointer",
-                fontSize: "10px",
-                padding: "6px 10px",
-                fontFamily: "var(--font-mono)",
-              }}
+              className="bg-none border border-zinc-800 text-zinc-505 cursor-pointer text-[10px] px-2 py-1 font-mono rounded-sm"
             >
               ×
             </button>
@@ -284,17 +182,7 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
                 localStorage.removeItem(LS_KEY);
                 setKeyPopoverOpen(false);
               }}
-              style={{
-                marginTop: "8px",
-                background: "none",
-                border: "none",
-                color: "#444",
-                cursor: "pointer",
-                fontSize: "10px",
-                padding: 0,
-                fontFamily: "var(--font-mono)",
-                letterSpacing: "0.06em",
-              }}
+              className="mt-2 bg-none border-none text-zinc-500 hover:text-zinc-400 cursor-pointer text-[10px] p-0 font-mono tracking-wide self-start"
             >
               CLEAR SAVED KEY
             </button>
@@ -304,18 +192,7 @@ export default function NLSearchBar({ onResult, onError }: NLSearchBarProps) {
 
       {/* Error */}
       {error && (
-        <div
-          style={{
-            marginTop: "1px",
-            fontSize: "10px",
-            color: "#e5484d",
-            background: "#111",
-            border: "1px solid #333",
-            borderLeft: "2px solid #e5484d",
-            padding: "8px 12px",
-            letterSpacing: "0.03em",
-          }}
-        >
+        <div className="mt-1 text-[10px] text-red-400 bg-zinc-950 border border-zinc-800 border-l-2 border-l-red-500 p-2.5 rounded-sm tracking-wide">
           {error}
         </div>
       )}

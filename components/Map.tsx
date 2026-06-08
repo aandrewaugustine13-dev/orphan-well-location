@@ -39,6 +39,9 @@ interface MapProps {
   searchLocation: { lat: number; lng: number; zoom?: number } | null;
   searchedLocation: { lat: number; lng: number } | null;
   searchedLabel: string | null;
+  showGroundwater: boolean;
+  showEpaSites: boolean;
+  showFloodZones: boolean;
 }
 
 interface ProgrammaticMove {
@@ -195,16 +198,16 @@ export default function Map({
   searchLocation,
   searchedLocation,
   searchedLabel,
+  showGroundwater,
+  showEpaSites,
+  showFloodZones,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
   const [rawWells, setRawWells] = useState<Well[]>([]);
   const [wells, setWells] = useState<Well[]>([]);
   const [groundwaterWells, setGroundwaterWells] = useState<GroundwaterWell[]>([]);
-  const [showGroundwater, setShowGroundwater] = useState(false);
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
-  const [showEpaSites, setShowEpaSites] = useState(false);
-  const [showFloodZones, setShowFloodZones] = useState(false);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -399,7 +402,7 @@ export default function Map({
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; CARTO'
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
         {showFloodZones && <FloodZoneOverlay />}
@@ -522,38 +525,6 @@ export default function Map({
           })}
       </MapContainer>
 
-      <div style={{ position: "absolute", bottom: 24, right: 12, zIndex: 1000, display: "flex", flexDirection: "column", gap: "6px" }}>
-        <button
-          onClick={() => setShowGroundwater((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showGroundwater
-              ? "bg-blue-600 text-white hover:bg-blue-700"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showGroundwater ? "Hide Groundwater Wells" : "Show Groundwater Wells"}
-        </button>
-        <button
-          onClick={() => setShowEpaSites((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showEpaSites
-              ? "bg-orange-500 text-white hover:bg-orange-600"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showEpaSites ? "Hide EPA Sites" : "Show EPA Sites"}
-        </button>
-        <button
-          onClick={() => setShowFloodZones((v) => !v)}
-          className={`px-3 py-2 rounded shadow text-sm font-medium transition-colors ${
-            showFloodZones
-              ? "bg-cyan-600 text-white hover:bg-cyan-700"
-              : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-          }`}
-        >
-          {showFloodZones ? "Hide Flood Zones" : "Show Flood Zones"}
-        </button>
-      </div>
     </div>
   );
 }

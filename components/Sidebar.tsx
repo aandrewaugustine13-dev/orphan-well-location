@@ -8,6 +8,7 @@ import {
   formatWellAge,
 } from "@/utils/supabase";
 import AddressSearch from "@/components/AddressSearch";
+import NLSearchBar, { NLResult } from "@/components/NLSearchBar";
 
 interface SidebarProps {
   wells: Well[];
@@ -23,14 +24,16 @@ interface SidebarProps {
   onSearchLocation: (lat: number, lng: number, label: string) => void;
   searchedLocation: { lat: number; lng: number } | null;
   searchedLabel: string | null;
+  
+  // Layer states & toggles
+  showGroundwater: boolean;
+  onToggleGroundwater: () => void;
+  showEpaSites: boolean;
+  onToggleEpaSites: () => void;
+  showFloodZones: boolean;
+  onToggleFloodZones: () => void;
+  onNLResult: (result: NLResult) => void;
 }
-
-const LABEL_STYLE = {
-  fontSize: "9px",
-  color: "#555",
-  letterSpacing: "0.15em",
-  fontFamily: "var(--font-mono)",
-} as const;
 
 export default function Sidebar({
   wells,
@@ -46,6 +49,13 @@ export default function Sidebar({
   onSearchLocation,
   searchedLocation,
   searchedLabel,
+  showGroundwater,
+  onToggleGroundwater,
+  showEpaSites,
+  onToggleEpaSites,
+  showFloodZones,
+  onToggleFloodZones,
+  onNLResult,
 }: SidebarProps) {
   const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);
 
@@ -68,22 +78,21 @@ export default function Sidebar({
     {
       label: "IN VIEW",
       value: loading ? "—" : String(wells.length),
-      color: "#e0e0e0",
+      color: "text-zinc-200",
     },
     {
       label: "20+ YR OLD",
       value: loading ? "—" : String(oldWells.length),
-      color: oldWells.length > 0 ? "#e5484d" : "#555",
+      color: oldWells.length > 0 ? "text-red-500" : "text-zinc-500",
     },
     {
       label: "OLDEST WELL",
       value: loading || !oldestWell ? "—" : formatWellAge(oldestWell).toUpperCase(),
       color:
-        oldestWell && (getWellAgeYears(oldestWell) ?? 0) >= 20 ? "#e5484d" : "#d4a017",
+        oldestWell && (getWellAgeYears(oldestWell) ?? 0) >= 20 ? "text-red-500" : "text-amber-500",
     },
   ];
 
-  // Distance stats only shown when a real address has been searched
   const closestWell = searchedLocation
     ? [...wells].sort((a, b) => (a.miles_away ?? Infinity) - (b.miles_away ?? Infinity))[0]
     : undefined;
@@ -97,7 +106,7 @@ export default function Sidebar({
       {
         label: "WITHIN 1 MI",
         value: loading ? "—" : String(closeWells.length),
-        color: closeWells.length > 0 ? "#e5484d" : "#555",
+        color: closeWells.length > 0 ? "text-red-500" : "text-zinc-500",
       },
       {
         label: "NEAREST MI",
@@ -108,11 +117,11 @@ export default function Sidebar({
         color:
           closestWell?.miles_away != null
             ? closestWell.miles_away <= 1
-              ? "#e5484d"
+              ? "text-red-500"
               : closestWell.miles_away <= 5
-              ? "#d4a017"
-              : "#30a46c"
-            : "#555",
+              ? "text-amber-500"
+              : "text-emerald-500"
+            : "text-zinc-500",
       }
     );
   }
@@ -123,163 +132,159 @@ export default function Sidebar({
       {!isOpen && (
         <button
           onClick={onToggle}
-          style={{
-            position: "absolute",
-            top: "56px",
-            left: "12px",
-            zIndex: 1000,
-            background: "#111",
-            border: "1px solid #333",
-            padding: "8px 12px",
-            color: "#888",
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            fontSize: "10px",
-            fontFamily: "var(--font-mono)",
-            letterSpacing: "0.1em",
-          }}
+          className="absolute top-14 left-3 z-[1000] bg-zinc-900 border border-zinc-800 px-3 py-2 text-zinc-400 hover:text-zinc-200 cursor-pointer flex items-center gap-2 text-xs font-mono tracking-wider rounded-sm shadow-md transition-colors"
         >
           ≡
           {wells.length > 0 && (
-            <span style={{ color: "#e0e0e0" }}>{wells.length}</span>
+            <span className="text-zinc-200 font-bold">{wells.length}</span>
           )}
         </button>
       )}
 
       {/* Panel */}
       <div
+        className="absolute top-0 left-0 w-[340px] h-full bg-zinc-950 border-r border-zinc-900 z-[1000] flex flex-col transition-transform duration-200 ease-out shadow-lg"
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "340px",
-          height: "100%",
-          background: "#111",
-          borderRight: "1px solid #333",
-          zIndex: 1000,
-          display: "flex",
-          flexDirection: "column",
           transform: isOpen ? "translateX(0)" : "translateX(-100%)",
-          transition: "transform 0.2s ease-out",
         }}
       >
         {/* ── Header ── */}
-        <div
-          style={{
-            padding: "14px 20px 12px",
-            borderBottom: "1px solid #222",
-            flexShrink: 0,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-          }}
-        >
+        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0 flex justify-between items-start">
           <div>
-            <div style={{ ...LABEL_STYLE, marginBottom: "4px" }}>
+            <div className="text-[10px] font-mono tracking-widest text-zinc-500 font-bold mb-1">
               ORPHAN WELL LOCATOR
             </div>
-            <div style={{ fontSize: "11px", color: "#888", fontFamily: "var(--font-mono)" }}>
-              {center.lat.toFixed(4)},{" "}
-              {center.lng.toFixed(4)}
+            <div className="text-xs font-mono text-zinc-400">
+              {center.lat.toFixed(4)}, {center.lng.toFixed(4)}
             </div>
           </div>
           <button
             onClick={onToggle}
-            style={{
-              background: "none",
-              border: "1px solid #2a2a2a",
-              color: "#555",
-              cursor: "pointer",
-              padding: "3px 8px",
-              fontSize: "14px",
-              fontFamily: "var(--font-mono)",
-              lineHeight: 1,
-            }}
+            className="bg-transparent border border-zinc-900 hover:border-zinc-700 text-zinc-500 hover:text-zinc-300 cursor-pointer px-2 py-0.5 text-xs font-mono leading-none rounded-sm transition-colors"
           >
             ×
           </button>
         </div>
 
-        {/* ── Address search ── */}
-        <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
-          <AddressSearch onSelect={(lat, lng, label) => onSearchLocation(lat, lng, label)} />
+        {/* ── Search & Query ── */}
+        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0 flex flex-col gap-3">
+          <div>
+            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2">GEOGRAPHIC SEARCH</div>
+            <AddressSearch onSelect={(lat, lng, label) => onSearchLocation(lat, lng, label)} />
+          </div>
+          <div>
+            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-1">NATURAL LANGUAGE QUERY</div>
+            <NLSearchBar onResult={onNLResult} onError={() => {}} />
+          </div>
         </div>
 
-        {/* ── Color mode — only show proximity when address is set ── */}
-        {searchedLocation && (
-          <div style={{ padding: "10px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
-            <div style={{ ...LABEL_STYLE, marginBottom: "7px" }}>COLOR BY</div>
-            <div style={{ display: "flex", gap: "6px" }}>
-              <button
-                onClick={() => onColorModeChange("age")}
-                style={{
-                  flex: 1,
-                  padding: "5px 0",
-                  fontSize: "9px",
-                  fontWeight: 500,
-                  letterSpacing: "0.12em",
-                  color: colorMode === "age" ? "#e0e0e0" : "#444",
-                  background: "none",
-                  border: colorMode === "age" ? "1px solid #666" : "1px solid #222",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                WELL AGE
-              </button>
-              <button
-                onClick={() => onColorModeChange("proximity")}
-                style={{
-                  flex: 1,
-                  padding: "5px 0",
-                  fontSize: "9px",
-                  fontWeight: 500,
-                  letterSpacing: "0.12em",
-                  color: colorMode === "proximity" ? "#e0e0e0" : "#444",
-                  background: "none",
-                  border: colorMode === "proximity" ? "1px solid #666" : "1px solid #222",
-                  cursor: "pointer",
-                  fontFamily: "var(--font-mono)",
-                }}
-              >
-                PROXIMITY
-              </button>
+        {/* ── Map Layers & Toggles ── */}
+        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0 flex flex-col gap-3">
+          {/* Color Mode Select */}
+          {searchedLocation && (
+            <div>
+              <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2">COLOR BY</div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onColorModeChange("age")}
+                  className={`flex-1 py-1.5 text-[10px] font-mono tracking-wider font-medium cursor-pointer rounded-sm border transition-colors ${
+                    colorMode === "age"
+                      ? "text-zinc-100 bg-zinc-900 border-zinc-700"
+                      : "text-zinc-500 bg-transparent border-zinc-900 hover:border-zinc-800"
+                  }`}
+                >
+                  WELL AGE
+                </button>
+                <button
+                  onClick={() => onColorModeChange("proximity")}
+                  className={`flex-1 py-1.5 text-[10px] font-mono tracking-wider font-medium cursor-pointer rounded-sm border transition-colors ${
+                    colorMode === "proximity"
+                      ? "text-zinc-100 bg-zinc-900 border-zinc-700"
+                      : "text-zinc-500 bg-transparent border-zinc-900 hover:border-zinc-800"
+                  }`}
+                >
+                  PROXIMITY
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Layer Toggles */}
+          <div>
+            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">MAP LAYERS</div>
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">GROUNDWATER WELLS</span>
+                <button
+                  onClick={onToggleGroundwater}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showGroundwater ? 'bg-blue-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showGroundwater}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showGroundwater ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">EPA CONTAMINATION SITES</span>
+                <button
+                  onClick={onToggleEpaSites}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showEpaSites ? 'bg-orange-500' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showEpaSites}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showEpaSites ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">FEMA FLOOD ZONES</span>
+                <button
+                  onClick={onToggleFloodZones}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showFloodZones ? 'bg-cyan-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showFloodZones}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showFloodZones ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
-        )}
+        </div>
 
         {/* ── Statistics ── */}
-        <div style={{ padding: "12px 20px", borderBottom: "1px solid #222", flexShrink: 0 }}>
-          <div style={{ ...LABEL_STYLE, marginBottom: "10px" }}>STATISTICS</div>
-          {stats.map(({ label, value, color }) => (
-            <div
-              key={label}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "baseline",
-                marginBottom: "5px",
-              }}
-            >
-              <span style={{ fontSize: "10px", color: "#555", letterSpacing: "0.06em" }}>
-                {label}
-              </span>
-              <span
-                style={{
-                  fontSize: "12px",
-                  color,
-                  fontFamily: "var(--font-mono)",
-                  fontWeight: 500,
-                }}
-              >
-                {value}
-              </span>
-            </div>
-          ))}
+        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0">
+          <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">STATISTICS</div>
+          <div className="flex flex-col gap-2">
+            {stats.map(({ label, value, color }) => (
+              <div key={label} className="flex justify-between items-baseline">
+                <span className="text-[10px] font-mono text-zinc-500 tracking-wider">
+                  {label}
+                </span>
+                <span className={`text-xs font-mono font-medium ${color}`}>
+                  {value}
+                </span>
+              </div>
+            ))}
+          </div>
           {searchedLocation && searchedLabel && (
-            <div style={{ fontSize: "9px", color: "#333", marginTop: "6px", letterSpacing: "0.04em" }}>
+            <div className="text-[9px] text-zinc-650 mt-2 font-mono tracking-wide">
               from {searchedLabel}
             </div>
           )}
@@ -287,60 +292,32 @@ export default function Sidebar({
 
         {/* ── Error ── */}
         {error && (
-          <div
-            style={{
-              padding: "10px 20px",
-              borderBottom: "1px solid #222",
-              borderLeft: "2px solid #e5484d",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{ fontSize: "9px", color: "#e5484d", letterSpacing: "0.12em", marginBottom: "3px" }}
-            >
+          <div className="p-4 px-5 border-b border-zinc-900 border-l-2 border-l-red-500 flex-shrink-0">
+            <div className="text-[9px] text-red-500 font-mono tracking-widest font-bold mb-1">
               CONNECTION ERROR
             </div>
-            <div style={{ fontSize: "10px", color: "#888", lineHeight: 1.6 }}>{error}</div>
+            <div className="text-xs text-zinc-400 leading-normal">{error}</div>
           </div>
         )}
 
         {/* ── Loading ── */}
         {loading && (
-          <div
-            style={{
-              padding: "8px 20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              borderBottom: "1px solid #1a1a1a",
-              flexShrink: 0,
-            }}
-          >
-            <div
-              style={{
-                width: "8px",
-                height: "8px",
-                border: "1px solid #333",
-                borderTopColor: "#888",
-                borderRadius: "50%",
-                animation: "spin 0.8s linear infinite",
-                flexShrink: 0,
-              }}
-            />
-            <span style={{ fontSize: "9px", color: "#555", letterSpacing: "0.1em" }}>
+          <div className="p-3 px-5 border-b border-zinc-900 flex items-center gap-2 flex-shrink-0">
+            <div className="w-2 h-2 border border-zinc-800 border-t-zinc-400 rounded-full animate-spin flex-shrink-0" />
+            <span className="text-[9px] text-zinc-500 font-mono tracking-wide">
               QUERYING DATABASE...
             </span>
           </div>
         )}
 
         {/* ── Well list ── */}
-        <div style={{ flex: 1, overflowY: "auto" }}>
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
           {!loading && wells.length === 0 && !error && (
-            <div style={{ padding: "32px 20px" }}>
-              <div style={{ fontSize: "10px", color: "#555", letterSpacing: "0.08em" }}>
+            <div className="p-8 px-5">
+              <div className="text-[10px] font-mono tracking-widest text-zinc-500 font-bold mb-2">
                 NO WELLS IN VIEWPORT
               </div>
-              <div style={{ fontSize: "10px", color: "#333", marginTop: "6px", lineHeight: 1.6 }}>
+              <div className="text-xs text-zinc-500 font-mono leading-relaxed">
                 pan or zoom to find orphan wells
               </div>
             </div>
@@ -359,62 +336,24 @@ export default function Sidebar({
               <button
                 key={well.api_number}
                 onClick={() => onSelectWell(isSelected ? null : well.api_number)}
+                className={`flex items-center w-full p-0 border-none border-b border-zinc-900 cursor-pointer text-left transition-colors duration-150 ${
+                  isSelected ? "bg-zinc-900 border-l-2" : "bg-transparent hover:bg-zinc-900/40 border-l-2 border-l-transparent"
+                }`}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  width: "100%",
-                  padding: "0",
-                  border: "none",
-                  borderBottom: "1px solid #1a1a1a",
-                  borderLeft: `2px solid ${isSelected ? color : "transparent"}`,
-                  background: isSelected ? "#181818" : "transparent",
-                  cursor: "pointer",
-                  textAlign: "left",
-                  color: "var(--text-primary)",
-                }}
-                onMouseEnter={(e) => {
-                  if (!isSelected) e.currentTarget.style.background = "#141414";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = isSelected ? "#181818" : "transparent";
+                  borderLeftColor: isSelected ? color : undefined,
                 }}
               >
-                <div style={{ flex: 1, minWidth: 0, padding: "7px 8px 7px 10px" }}>
-                  <div
-                    style={{
-                      fontFamily: "var(--font-mono)",
-                      fontSize: "11px",
-                      color: "#e0e0e0",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
+                <div className="flex-1 min-w-0 p-2 px-3">
+                  <div className="font-mono text-xs text-zinc-300 truncate">
                     {well.api_number}
                   </div>
-                  <div
-                    style={{
-                      fontSize: "10px",
-                      color: "#555",
-                      marginTop: "2px",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                      letterSpacing: "0.02em",
-                    }}
-                  >
+                  <div className="text-[10px] text-zinc-500 mt-0.5 truncate tracking-wide font-mono">
                     {[well.operator_name, well.county, well.state].filter(Boolean).join(" · ")}
                   </div>
                 </div>
                 <div
-                  style={{
-                    flexShrink: 0,
-                    paddingRight: "10px",
-                    fontSize: "10px",
-                    color,
-                    letterSpacing: "0.04em",
-                    fontFamily: "var(--font-mono)",
-                  }}
+                  className="flex-shrink-0 pr-3 text-[10px] font-mono tracking-wider font-semibold"
+                  style={{ color }}
                 >
                   {metricValue}
                 </div>
@@ -424,20 +363,11 @@ export default function Sidebar({
         </div>
 
         {/* ── Footer / Legend ── */}
-        <div
-          style={{
-            padding: "10px 20px",
-            borderTop: "1px solid #222",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={{ fontSize: "9px", color: "#333", letterSpacing: "0.08em" }}>
+        <div className="p-3.5 px-5 border-t border-zinc-900 flex-shrink-0 flex items-center justify-between">
+          <span className="text-[9px] text-zinc-600 font-mono tracking-widest font-bold">
             USGS / STATE AGENCIES
           </span>
-          <div style={{ display: "flex", gap: "10px" }}>
+          <div className="flex gap-2">
             {(colorMode === "proximity" && searchedLocation
               ? [
                   { color: "#e5484d", label: "<1MI" },
@@ -450,9 +380,9 @@ export default function Sidebar({
                   { color: "#e5484d", label: "20+YR" },
                 ]
             ).map(({ color, label }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                <div style={{ width: "6px", height: "6px", background: color }} />
-                <span style={{ fontSize: "9px", color: "#555", letterSpacing: "0.06em" }}>
+              <div key={label} className="flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-sm" style={{ background: color }} />
+                <span className="text-[9px] text-zinc-500 font-mono tracking-wider">
                   {label}
                 </span>
               </div>

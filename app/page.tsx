@@ -4,8 +4,8 @@ import dynamic from "next/dynamic";
 import { useState, useCallback } from "react";
 import Sidebar from "@/components/Sidebar";
 import LandingOverlay from "@/components/LandingOverlay";
-import NLSearchBar, { NLResult } from "@/components/NLSearchBar";
 import { Well, ColorMode } from "@/utils/supabase";
+import { NLResult } from "@/components/NLSearchBar";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
 
@@ -28,6 +28,11 @@ export default function Home() {
   const [searchLocation, setSearchLocation] = useState<{ lat: number; lng: number; zoom?: number; label?: string } | null>(null);
   const [nlSummary, setNlSummary] = useState<string | null>(null);
 
+  // Map layer toggle states
+  const [showGroundwater, setShowGroundwater] = useState(false);
+  const [showEpaSites, setShowEpaSites] = useState(false);
+  const [showFloodZones, setShowFloodZones] = useState(false);
+
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
   const handleCenterChange = useCallback((lat: number, lng: number) => setCenter({ lat, lng }), []);
@@ -42,6 +47,10 @@ export default function Home() {
     if (mode === "proximity" && !searchLocation?.label) return;
     setColorMode(mode);
   }, [searchLocation]);
+
+  const handleToggleGroundwater = useCallback(() => setShowGroundwater((v) => !v), []);
+  const handleToggleEpaSites = useCallback(() => setShowEpaSites((v) => !v), []);
+  const handleToggleFloodZones = useCallback(() => setShowFloodZones((v) => !v), []);
 
   const handleNLResult = useCallback((result: NLResult) => {
     // NL results navigate the map but don't set a reference address — reset to age
@@ -136,11 +145,10 @@ export default function Home() {
           searchLocation={searchLocation}
           searchedLocation={searchLocation}
           searchedLabel={searchLocation?.label ?? null}
+          showGroundwater={showGroundwater}
+          showEpaSites={showEpaSites}
+          showFloodZones={showFloodZones}
         />
-
-        {!showLanding && (
-          <NLSearchBar onResult={handleNLResult} onError={() => {}} />
-        )}
 
         {/* NL summary toast */}
         {!showLanding && nlSummary && (
@@ -213,6 +221,13 @@ export default function Home() {
             onSearchLocation={handleSearchLocation}
             searchedLocation={searchLocation}
             searchedLabel={searchLocation?.label ?? null}
+            showGroundwater={showGroundwater}
+            onToggleGroundwater={handleToggleGroundwater}
+            showEpaSites={showEpaSites}
+            onToggleEpaSites={handleToggleEpaSites}
+            showFloodZones={showFloodZones}
+            onToggleFloodZones={handleToggleFloodZones}
+            onNLResult={handleNLResult}
           />
         </div>
       )}
