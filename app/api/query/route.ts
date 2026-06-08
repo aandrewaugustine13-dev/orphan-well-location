@@ -27,13 +27,23 @@ JSON Schema:
 
 CRITICAL RULES:
 1. Strip "County" or "Co." from the county name.
-2. Only output the raw JSON. No markdown code blocks, no trailing comments.`;
+2. Only output the raw JSON. No markdown code blocks, no trailing comments.
+3. Return ONLY valid JSON. Do not use markdown formatting. Do not include conversational text.`;
 
 interface ParsedQuery {
   state: string;
   county: string;
   radius_miles: number;
   query_type: "orphan_near_groundwater" | "nearest_orphan_to_groundwater" | "orphan_count" | "general";
+}
+
+function extractJson(rawText: string): string {
+  const startIdx = rawText.indexOf("{");
+  const endIdx = rawText.lastIndexOf("}");
+  if (startIdx === -1 || endIdx === -1 || startIdx > endIdx) {
+    throw new Error("No JSON object found in response");
+  }
+  return rawText.substring(startIdx, endIdx + 1).trim();
 }
 
 interface WellRow {
@@ -88,7 +98,8 @@ export async function POST(req: NextRequest) {
     });
 
     const text = msg.content.find((c) => c.type === "text")?.text ?? "";
-    parsed = JSON.parse(text.trim());
+    const cleanedText = extractJson(text);
+    parsed = JSON.parse(cleanedText);
 
     if (!parsed.state || !parsed.county || !parsed.query_type) {
       throw new Error("Missing required fields");
