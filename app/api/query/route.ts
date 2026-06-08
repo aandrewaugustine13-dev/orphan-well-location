@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
 const MILES_TO_METERS = 1609.34;
 
 const SYSTEM_PROMPT = `You are a deterministic translation engine that converts natural language environmental queries into a strict, parameterized JSON payload for PostGIS query execution.
@@ -60,17 +58,24 @@ export async function POST(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  let body: { query?: string };
+  let body: { query?: string; apiKey?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { query } = body;
+  const { query, apiKey: clientApiKey } = body;
   if (!query || typeof query !== "string") {
     return NextResponse.json({ error: "Missing query" }, { status: 400 });
   }
+
+  const activeApiKey = clientApiKey || process.env.ANTHROPIC_API_KEY;
+  if (!activeApiKey) {
+    return NextResponse.json({ error: "Missing Anthropic API Key" }, { status: 401 });
+  }
+
+  const anthropic = new Anthropic({ apiKey: activeApiKey });
 
   // Step 1: Parse with Claude
   let parsed: ParsedQuery;
