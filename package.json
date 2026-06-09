@@ -27,6 +27,7 @@
     "ts-node": "^10.9.2"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.8",
     "@types/node": "^20.19.42",
     "@types/react": "^19",
     "@types/react-dom": "^19",

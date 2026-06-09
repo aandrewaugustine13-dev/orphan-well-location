@@ -30,12 +30,18 @@ async function downloadShapefiles() {
     const clicked = await page.evaluate(() => {
         const cbs = document.querySelectorAll('input[type="checkbox"]');
         if (cbs.length > 0) {
-            cbs.forEach(c => { if (!c.checked) c.click(); });
+            cbs.forEach(c => { 
+                const cb = c as HTMLInputElement;
+                if (!cb.checked) cb.click(); 
+            });
         }
         
-        const btns = Array.from(document.querySelectorAll('a, button')).filter(el => (el.innerText || '').toLowerCase().includes('download'));
+        const btns = Array.from(document.querySelectorAll('a, button')).filter(el => {
+            const htmlEl = el as HTMLElement;
+            return (htmlEl.innerText || '').toLowerCase().includes('download');
+        });
         if (btns.length > 0) {
-            btns[0].click();
+            (btns[0] as HTMLElement).click();
             return true;
         }
         return false;
