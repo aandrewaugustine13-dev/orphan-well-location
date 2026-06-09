@@ -59,10 +59,12 @@ async function ingestFEMAData(stateFipsCode: string) {
         // Using a composite ID in case DFIRM_IDs overlap across counties
         const zoneId = `${feature.properties.DFIRM_ID}_${offset}`; 
         
-        const { error } = await supabase.rpc('ingest_fema_geojson', {
-          p_zone_id: zoneId,
-          p_zone_type: feature.properties.FLD_ZONE,
-          p_state_fips: stateFipsCode,
+        const { error } = await supabase.rpc('ingest_geometry_geojson', {
+          p_table_name: 'fema_flood_zones',
+          p_id_column: 'zone_id',
+          p_id_value: zoneId,
+          p_type_column: 'zone_type',
+          p_type_value: feature.properties.FLD_ZONE,
           p_geojson: feature.geometry
         });
 

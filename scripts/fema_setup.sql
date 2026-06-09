@@ -1,5 +1,5 @@
--- ── FEMA Flood Zones table + RPC setup ──────────────────────────────────────────
--- Run this in the Supabase SQL Editor BEFORE running the seed script.
+-- ── FEMA Flood Zones table + Generic Ingestion RPC setup ───────────────────────
+-- Run this in the Supabase SQL Editor to set up the table and generic function.
 
 -- 1. Create the table
 CREATE TABLE IF NOT EXISTS fema_flood_zones (
@@ -12,31 +12,29 @@ CREATE TABLE IF NOT EXISTS fema_flood_zones (
 -- 2. Spatial index (critical for location queries)
 CREATE INDEX IF NOT EXISTS fema_flood_zones_geom_idx ON fema_flood_zones USING GIST(geom);
 
--- 3. RPC to ingest a single simplified GeoJSON polygon/multipolygon
-CREATE OR REPLACE FUNCTION ingest_fema_geojson(
-  p_zone_id text,
-  p_zone_type text,
-  p_state_fips text,
+-- 3. Generic RPC to ingest a simplified GeoJSON geometry into any PostGIS table
+CREATE OR REPLACE FUNCTION ingest_geometry_geojson(
+  p_table_name text,
+  p_id_column text,
+  p_id_value text,
+  p_type_column text,
+  p_type_value text,
   p_geojson jsonb
 )
 RETURNS void
 LANGUAGE plpgsql
-SECURITY DEFINER -- Executes with database owner privileges
+SECURITY DEFINER -- Runs with creator privileges to bypass RLS
 AS $$
 BEGIN
-  INSERT INTO fema_flood_zones (zone_id, zone_type, state_fips, geom)
-  VALUES (
-    p_zone_id,
-    p_zone_type,
-    p_state_fips,
-    ST_SimplifyPreserveTopology(
-      ST_SetSRID(ST_GeomFromGeoJSON(p_geojson::text), 4326),
-      0.001 -- default simplification tolerance (approx 100m) to keep DB storage optimized
-    )::geography
+  EXECUTE format(
+    'INSERT INTO %I (%I, %I, geom) ' ||
+    'VALUES ($1, $2, ST_SimplifyPreserveTopology(ST_SetSRID(ST_GeomFromGeoJSON($3), 4326), 0.001)::geography) ' ||
+    'ON CONFLICT (%I) DO UPDATE ' ||
+    'SET %I = EXCLUDED.%I, geom = EXCLUDED.geom',
+    p_table_name, p_id_column, p_type_column,
+    p_id_column,
+    p_type_column, p_type_column
   )
-  ON CONFLICT (zone_id) DO UPDATE
-  SET zone_type = EXCLUDED.zone_type,
-      state_fips = EXCLUDED.state_fips,
-      geom = EXCLUDED.geom;
+  USING p_id_value, p_type_value, p_geojson::text;
 END;
 $$;
