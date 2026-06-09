@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   CircleMarker,
-  ImageOverlay,
+  GeoJSON,
   MapContainer,
   Popup,
   TileLayer,
@@ -81,6 +81,13 @@ interface EpaSite {
   npl_status: string | null;
 }
 
+interface FemaZone {
+  zone_id: string;
+  zone_type: string;
+  state_fips: string | null;
+  geom: any;
+}
+
 const DEFAULT_CENTER: [number, number] = [39.8, -98.5];
 const DEFAULT_ZOOM = 5;
 const FETCH_DEBOUNCE_MS = 400;
@@ -139,54 +146,7 @@ function MapController({
   return null;
 }
 
-const FEMA_EXPORT =
-  "https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/export";
 
-function FloodZoneOverlay() {
-  const map = useMap();
-  const [overlay, setOverlay] = useState<{
-    url: string;
-    bounds: [[number, number], [number, number]];
-  } | null>(null);
-
-  useEffect(() => {
-    function update() {
-      const b = map.getBounds();
-      const sz = map.getSize();
-      const minX = b.getWest();
-      const minY = b.getSouth();
-      const maxX = b.getEast();
-      const maxY = b.getNorth();
-      const params = new URLSearchParams({
-        bbox: `${minX},${minY},${maxX},${maxY}`,
-        bboxSR: "4326",
-        layers: "show:28",
-        size: `${sz.x},${sz.y}`,
-        imageSR: "4326",
-        format: "png32",
-        transparent: "true",
-        f: "image",
-      });
-      setOverlay({
-        url: `${FEMA_EXPORT}?${params}`,
-        bounds: [[minY, minX], [maxY, maxX]],
-      });
-    }
-    map.on("moveend", update);
-    update();
-    return () => { map.off("moveend", update); };
-  }, [map]);
-
-  if (!overlay) return null;
-  return (
-    <ImageOverlay
-      url={overlay.url}
-      bounds={overlay.bounds}
-      opacity={0.55}
-      zIndex={400}
-    />
-  );
-}
 
 export default function Map({
   onWellsLoaded,
@@ -202,7 +162,7 @@ export default function Map({
   showOrphanWells,
   showGroundwater,
   showEpaSites,
-  showFloodZones,
+  showFloodZones: showFemaFloodZones,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
@@ -210,11 +170,13 @@ export default function Map({
   const [wells, setWells] = useState<Well[]>([]);
   const [groundwaterWells, setGroundwaterWells] = useState<GroundwaterWell[]>([]);
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
+  const [femaData, setFemaData] = useState<FemaZone[]>([]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const gwRequestIdRef = useRef(0);
   const epaRequestIdRef = useRef(0);
+  const femaRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
 
   const handleMoveEnd = useCallback(
@@ -395,6 +357,39 @@ export default function Map({
     loadEpaSites();
   }, [queryBounds, showEpaSites]);
 
+  // Fetch FEMA flood zones within the current viewport bounds
+  useEffect(() => {
+    if (!showFemaFloodZones || !queryBounds) {
+      setFemaData([]);
+      return;
+    }
+
+    const requestId = ++femaRequestIdRef.current;
+    const bounds = queryBounds;
+
+    async function loadFemaZones() {
+      if (!supabase) return;
+
+      const bboxWkt = `SRID=4326;POLYGON((${bounds.minLng} ${bounds.minLat}, ${bounds.maxLng} ${bounds.minLat}, ${bounds.maxLng} ${bounds.maxLat}, ${bounds.minLng} ${bounds.maxLat}, ${bounds.minLng} ${bounds.minLat}))`;
+
+      const { data, error } = await supabase
+        .from("fema_flood_zones")
+        .select("zone_id, zone_type, state_fips, geom")
+        .filter("geom", "st_intersects", bboxWkt)
+        .limit(200);
+
+      if (requestId !== femaRequestIdRef.current) return;
+      if (error) {
+        console.error("Error fetching FEMA flood zones:", error);
+        return;
+      }
+
+      setFemaData((data as FemaZone[]) ?? []);
+    }
+
+    loadFemaZones();
+  }, [queryBounds, showFemaFloodZones]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <MapContainer
@@ -407,7 +402,18 @@ export default function Map({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {showFloodZones && <FloodZoneOverlay />}
+        {showFemaFloodZones && femaData.map((zone) => (
+          <GeoJSON
+            key={zone.zone_id}
+            data={zone.geom} // Directly passing the PostGIS GeoJSON geometry object
+            style={() => ({
+              color: '#38bdf8',       // Clean light blue border
+              weight: 1,             // Thin line weight so it isn't blocky
+              fillColor: '#0284c7',   // Slightly deeper blue fill
+              fillOpacity: 0.25,     // Translucent so underlying streets stay visible
+            })}
+          />
+        ))}
 
         <MapController programmaticMove={programmaticMove} onMoveEnd={handleMoveEnd} />
 
