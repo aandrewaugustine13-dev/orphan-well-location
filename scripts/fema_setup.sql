@@ -21,6 +21,7 @@ CREATE OR REPLACE FUNCTION ingest_fema_geojson(
 )
 RETURNS void
 LANGUAGE plpgsql
+SECURITY DEFINER -- Executes with database owner privileges
 AS $$
 BEGIN
   INSERT INTO fema_flood_zones (zone_id, zone_type, state_fips, geom)
@@ -37,8 +38,5 @@ BEGIN
   SET zone_type = EXCLUDED.zone_type,
       state_fips = EXCLUDED.state_fips,
       geom = EXCLUDED.geom;
-EXCEPTION WHEN OTHERS THEN
-  -- Skip invalid geometries gracefully
-  RAISE NOTICE 'Skipping invalid geometry for Zone ID %: %', p_zone_id, SQLERRM;
 END;
 $$;

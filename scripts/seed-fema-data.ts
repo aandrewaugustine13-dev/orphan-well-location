@@ -16,21 +16,21 @@ const supabase = createClient(
 );
 
 // FEMA NFHL ArcGIS REST API Endpoint (Layer 28 is standard Flood Hazard Zones)
-const FEMA_API_BASE = 'https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query';
+const FEMA_API_BASE = 'https://hazards.fema.gov/arcgis/rest/services/public/NFHL/MapServer/28/query';
 
 async function ingestFEMAData(stateFipsCode: string) {
   console.log(`Starting FEMA ingestion for State FIPS: ${stateFipsCode}...`);
   
   let offset = 0;
-  const batchSize = 1000;
+  const batchSize = 100;
   let hasMoreData = true;
 
   while (hasMoreData) {
     try {
       // Build the query: High-risk zones only (A and V), chunked by pagination
       const params = new URLSearchParams({
-        where: `(FLD_ZONE LIKE 'A%' OR FLD_ZONE LIKE 'V%') AND STATE_FIPS = '${stateFipsCode}'`,
-        outFields: 'DFIRM_ID,FLD_ZONE,STATE_FIPS',
+        where: `(FLD_ZONE LIKE 'A%' OR FLD_ZONE LIKE 'V%') AND DFIRM_ID LIKE '${stateFipsCode}%'`,
+        outFields: 'DFIRM_ID,FLD_ZONE',
         outSR: '4326', // Request standard WGS84 coordinates
         f: 'geojson',
         resultOffset: offset.toString(),
@@ -62,7 +62,7 @@ async function ingestFEMAData(stateFipsCode: string) {
         const { error } = await supabase.rpc('ingest_fema_geojson', {
           p_zone_id: zoneId,
           p_zone_type: feature.properties.FLD_ZONE,
-          p_state_fips: feature.properties.STATE_FIPS,
+          p_state_fips: stateFipsCode,
           p_geojson: feature.geometry
         });
 
