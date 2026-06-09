@@ -416,14 +416,12 @@ export default function Map({
     async function loadFrackingSites() {
       if (!supabase) return;
 
-      const { data, error } = await supabase
-        .from("fracking_sites")
-        .select("*")
-        .gte("latitude", bounds.minLat)
-        .lte("latitude", bounds.maxLat)
-        .gte("longitude", bounds.minLng)
-        .lte("longitude", bounds.maxLng)
-        .limit(5000);
+      const { data, error } = await supabase.rpc('get_fracking_sites_in_bounds', {
+        min_lng: bounds.minLng,
+        min_lat: bounds.minLat,
+        max_lng: bounds.maxLng,
+        max_lat: bounds.maxLat
+      });
 
       console.log("Fracking sites fetch result:", { data, error });
 
