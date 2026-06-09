@@ -55,9 +55,11 @@ async function ingestFEMAData(stateFipsCode: string) {
       console.log(`Fetched ${data.features.length} polygons. Pushing to Supabase...`);
 
       // Push each polygon to the Supabase PostGIS receiver
-      for (const feature of data.features) {
-        // Using a composite ID in case DFIRM_IDs overlap across counties
-        const zoneId = `${feature.properties.DFIRM_ID}_${offset}`; 
+      for (let i = 0; i < data.features.length; i++) {
+        const feature = data.features[i];
+        
+        // Combine DFIRM_ID, the batch offset, and the loop index for a truly unique key
+        const zoneId = `${feature.properties.DFIRM_ID || 'FEMA'}_${offset}_${i}`; 
         
         const { error } = await supabase.rpc('ingest_geometry_geojson', {
           p_table_name: 'fema_flood_zones',
