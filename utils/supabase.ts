@@ -71,17 +71,17 @@ export function formatLiability(est: number | null | undefined): string {
 
 // Color helpers
 export function getProximityColor(miles: number): string {
-  if (miles <= 1) return "#e5484d";
-  if (miles <= 5) return "#f0a000";
-  return "#30a46c";
+  if (miles <= 1) return "#ef4444";  // Red
+  if (miles <= 5) return "#f97316";  // Orange
+  return "#facc15";                  // Yellow
 }
 
 export function getWellAgeColor(well: Well): string {
   const years = getWellAgeYears(well);
-  if (years == null) return "#f8fafc";  // high-contrast white/slate for unknown (no spud date)
-  if (years >= 20) return "#e5484d";   // red - over 20 years
-  if (years >= 10) return "#f0a000";   // yellow/orange - 10–20 years
-  return "#30a46c";                     // green - under 10 years
+  if (years == null) return "#f8fafc";  // Age Unknown: White / Slate
+  if (years >= 20) return "#ef4444";   // 20+ Years Old: Red
+  if (years >= 10) return "#f97316";   // 10 - 20 Years Old: Orange
+  return "#facc15";                     // < 10 Years Old: Yellow
 }
 
 export function getWellColor(well: Well, mode: ColorMode): string {

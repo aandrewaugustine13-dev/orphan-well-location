@@ -6,6 +6,7 @@ import {
   GeoJSON,
   MapContainer,
   Popup,
+  ScaleControl,
   TileLayer,
   useMap,
   useMapEvents,
@@ -531,6 +532,8 @@ export default function Map({
               </CircleMarker>
             );
           })}
+
+        <ScaleControl position="bottomright" imperial={true} metric={true} />
       </MapContainer>
 
     </div>

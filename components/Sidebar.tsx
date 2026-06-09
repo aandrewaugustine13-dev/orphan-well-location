@@ -384,30 +384,55 @@ export default function Sidebar({
         </div>
 
         {/* ── Footer / Legend ── */}
-        <div className="p-3.5 px-5 border-t border-zinc-900 flex-shrink-0 flex items-center justify-between">
-          <span className="text-[9px] text-zinc-600 font-mono tracking-widest font-bold">
-            USGS / STATE AGENCIES
-          </span>
-          <div className="flex gap-2">
-            {(colorMode === "proximity" && searchedLocation
-              ? [
-                  { color: "#e5484d", label: "<1MI" },
-                  { color: "#d4a017", label: "<5MI" },
-                  { color: "#30a46c", label: "5+MI" },
-                ]
-              : [
-                  { color: "#30a46c", label: "<10YR" },
-                  { color: "#f0a000", label: "10-20" },
-                  { color: "#e5484d", label: "20+YR" },
-                ]
-            ).map(({ color, label }) => (
-              <div key={label} className="flex items-center gap-1">
-                <div className="w-1.5 h-1.5 rounded-sm" style={{ background: color }} />
-                <span className="text-[9px] text-zinc-500 font-mono tracking-wider">
-                  {label}
-                </span>
-              </div>
-            ))}
+        <div className="p-4 border-t border-zinc-900 flex-shrink-0 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] text-zinc-600 font-mono tracking-widest font-bold">
+              MAP LEGEND
+            </span>
+            {colorMode === "proximity" && searchedLocation && (
+              <span className="text-[9px] text-zinc-500 font-mono">PROXIMITY ACTIVE</span>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+            {colorMode === "proximity" && searchedLocation ? (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#ef4444" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 1MI</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#f97316" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 5MI</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#facc15" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">5+MI</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm border border-zinc-800" style={{ background: "#f8fafc" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">UNKNOWN</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#facc15" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 10YR</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#f97316" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">10-20YR</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-sm" style={{ background: "#ef4444" }} />
+                  <span className="text-[10px] text-zinc-500 font-mono tracking-wider">20+YR</span>
+                </div>
+              </>
+            )}
+            <div className="flex items-center gap-1.5 col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
+              <div className="w-2.5 h-2 rounded-sm" style={{ background: "#0284c7", border: "1px solid #38bdf8" }} />
+              <span className="text-[10px] text-zinc-500 font-mono tracking-wider">FEMA FLOOD ZONE</span>
+            </div>
           </div>
         </div>
       </div>
