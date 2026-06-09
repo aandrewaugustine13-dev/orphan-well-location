@@ -22,7 +22,7 @@ async function ingestFEMAData(stateFipsCode: string) {
   console.log(`Starting FEMA ingestion for State FIPS: ${stateFipsCode}...`);
   
   let offset = 0;
-  const batchSize = 100;
+  const batchSize = 250;
   let hasMoreData = true;
 
   while (hasMoreData) {
@@ -57,6 +57,12 @@ async function ingestFEMAData(stateFipsCode: string) {
       // Push each polygon to the Supabase PostGIS receiver
       for (let i = 0; i < data.features.length; i++) {
         const feature = data.features[i];
+
+        // Guard clause to skip features without valid geometry
+        if (!feature.geometry || !feature.geometry.coordinates) {
+          console.warn(`[Skip] Feature ${i} at offset ${offset} has null or invalid geometry.`);
+          continue;
+        }
         
         // Combine DFIRM_ID, the batch offset, and the loop index for a truly unique key
         const zoneId = `${feature.properties.DFIRM_ID || 'FEMA'}_${offset}_${i}`; 
@@ -75,14 +81,13 @@ async function ingestFEMAData(stateFipsCode: string) {
         }
       }
 
+    } catch (err) {
+      console.error(`Error processing batch at offset ${offset}:`, err);
+    } finally {
       offset += batchSize;
       
       // Quick breather to respect rate limits and avoid blocking
       await new Promise(resolve => setTimeout(resolve, 1000));
-
-    } catch (err) {
-      console.error('Fatal Pipeline Error:', err);
-      hasMoreData = false;
     }
   }
   console.log('Ingestion pipeline successfully closed.');
