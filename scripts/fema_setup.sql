@@ -38,3 +38,9 @@ BEGIN
   USING p_id_value, p_type_value, p_geojson::text;
 END;
 $$;
+
+-- 4. Enable RLS and add a policy to allow public select access
+ALTER TABLE fema_flood_zones ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Allow public read access" ON fema_flood_zones;
+CREATE POLICY "Allow public read access" ON fema_flood_zones FOR SELECT USING (true);
