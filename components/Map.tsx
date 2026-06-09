@@ -425,6 +425,8 @@ export default function Map({
         .lte("longitude", bounds.maxLng)
         .limit(5000);
 
+      console.log("Fracking sites fetch result:", { data, error });
+
       if (requestId !== frackingRequestIdRef.current) return;
       if (error) {
         console.error("Error fetching fracking sites:", error);

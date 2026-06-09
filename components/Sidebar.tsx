@@ -256,6 +256,23 @@ export default function Sidebar({
                 </button>
               </div>
               <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">ACTIVE FRACKING SITES</span>
+                <button
+                  onClick={onToggleFrackingSites}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showFrackingSites ? 'bg-pink-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showFrackingSites}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showFrackingSites ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono tracking-wider text-zinc-400">EPA CONTAMINATION SITES</span>
                 <button
                   onClick={onToggleEpaSites}
