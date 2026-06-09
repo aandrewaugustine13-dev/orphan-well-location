@@ -78,9 +78,9 @@ export function getProximityColor(miles: number): string {
 
 export function getWellAgeColor(well: Well): string {
   const years = getWellAgeYears(well);
-  if (years == null) return "#505c72";  // gray - no spud date
+  if (years == null) return "#f8fafc";  // high-contrast white/slate for unknown (no spud date)
   if (years >= 20) return "#e5484d";   // red - over 20 years
-  if (years >= 10) return "#f0a000";   // yellow - 10–20 years
+  if (years >= 10) return "#f0a000";   // yellow/orange - 10–20 years
   return "#30a46c";                     // green - under 10 years
 }
 
