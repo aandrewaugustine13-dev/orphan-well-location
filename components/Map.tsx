@@ -44,6 +44,7 @@ interface MapProps {
   showGroundwater: boolean;
   showEpaSites: boolean;
   showFloodZones: boolean;
+  showFrackingSites: boolean;
 }
 
 interface ProgrammaticMove {
@@ -87,6 +88,15 @@ interface FemaZone {
   zone_type: string;
   state_fips: string | null;
   geom: any;
+}
+
+interface FrackingSite {
+  id: number;
+  api_number: string;
+  operator_name: string;
+  latitude: number;
+  longitude: number;
+  well_type: string;
 }
 
 const DEFAULT_CENTER: [number, number] = [39.8, -98.5];
@@ -164,6 +174,7 @@ export default function Map({
   showGroundwater,
   showEpaSites,
   showFloodZones: showFemaFloodZones,
+  showFrackingSites,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
@@ -172,12 +183,14 @@ export default function Map({
   const [groundwaterWells, setGroundwaterWells] = useState<GroundwaterWell[]>([]);
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
   const [femaData, setFemaData] = useState<FemaZone[]>([]);
+  const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
   const gwRequestIdRef = useRef(0);
   const epaRequestIdRef = useRef(0);
   const femaRequestIdRef = useRef(0);
+  const frackingRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
 
   const handleMoveEnd = useCallback(
@@ -390,6 +403,40 @@ export default function Map({
     loadFemaZones();
   }, [queryBounds, showFemaFloodZones]);
 
+  // Fetch Fracking Sites within the current viewport bounds
+  useEffect(() => {
+    if (!showFrackingSites || !queryBounds) {
+      setFrackingSites([]);
+      return;
+    }
+
+    const requestId = ++frackingRequestIdRef.current;
+    const bounds = queryBounds;
+
+    async function loadFrackingSites() {
+      if (!supabase) return;
+
+      const { data, error } = await supabase
+        .from("fracking_sites")
+        .select("*")
+        .gte("latitude", bounds.minLat)
+        .lte("latitude", bounds.maxLat)
+        .gte("longitude", bounds.minLng)
+        .lte("longitude", bounds.maxLng)
+        .limit(5000);
+
+      if (requestId !== frackingRequestIdRef.current) return;
+      if (error) {
+        console.error("Error fetching fracking sites:", error);
+        return;
+      }
+
+      setFrackingSites((data as FrackingSite[]) ?? []);
+    }
+
+    loadFrackingSites();
+  }, [queryBounds, showFrackingSites]);
+
   return (
     <div style={{ position: "relative", width: "100%", height: "100%" }}>
       <MapContainer
@@ -532,6 +579,30 @@ export default function Map({
               </CircleMarker>
             );
           })}
+
+        {showFrackingSites &&
+          frackingSites.map((site) => (
+            <CircleMarker
+              key={site.id}
+              center={[site.latitude, site.longitude]}
+              radius={5}
+              pathOptions={{
+                color: "#be185d", // Deep pink/rose border
+                fillColor: "#ec4899", // Vibrant pink fill
+                fillOpacity: 0.8,
+                weight: 1,
+              }}
+            >
+              <Popup>
+                <div style={{ minWidth: 200 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 6 }}>Active Fracking Site</div>
+                  <div>API: {site.api_number}</div>
+                  <div>Operator: <span style={{ fontWeight: 600 }}>{site.operator_name || "Unknown"}</span></div>
+                  <div>Type: {site.well_type}</div>
+                </div>
+              </Popup>
+            </CircleMarker>
+          ))}
 
         <ScaleControl position="bottomright" imperial={true} metric={true} />
       </MapContainer>

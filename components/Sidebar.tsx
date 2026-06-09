@@ -34,6 +34,8 @@ interface SidebarProps {
   onToggleEpaSites: () => void;
   showFloodZones: boolean;
   onToggleFloodZones: () => void;
+  showFrackingSites: boolean;
+  onToggleFrackingSites: () => void;
   onNLResult: (result: NLResult) => void;
 }
 
@@ -59,6 +61,8 @@ export default function Sidebar({
   onToggleEpaSites,
   showFloodZones,
   onToggleFloodZones,
+  showFrackingSites,
+  onToggleFrackingSites,
   onNLResult,
 }: SidebarProps) {
   const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);

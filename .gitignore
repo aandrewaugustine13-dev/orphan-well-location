@@ -34,3 +34,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# data and scratch
+/data/
+/temp_wells/
+/well001/
+*.html
+test-*.js
+robust-download.js

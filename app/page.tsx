@@ -33,6 +33,7 @@ export default function Home() {
   const [showGroundwater, setShowGroundwater] = useState(false);
   const [showEpaSites, setShowEpaSites] = useState(false);
   const [showFloodZones, setShowFloodZones] = useState(false);
+  const [showFrackingSites, setShowFrackingSites] = useState(false);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
@@ -53,6 +54,7 @@ export default function Home() {
   const handleToggleGroundwater = useCallback(() => setShowGroundwater((v) => !v), []);
   const handleToggleEpaSites = useCallback(() => setShowEpaSites((v) => !v), []);
   const handleToggleFloodZones = useCallback(() => setShowFloodZones((v) => !v), []);
+  const handleToggleFrackingSites = useCallback(() => setShowFrackingSites((v) => !v), []);
 
   const handleNLResult = useCallback((result: NLResult) => {
     // NL results navigate the map but don't set a reference address — reset to age
@@ -158,6 +160,7 @@ export default function Home() {
           showGroundwater={showGroundwater}
           showEpaSites={showEpaSites}
           showFloodZones={showFloodZones}
+          showFrackingSites={showFrackingSites}
         />
 
         {/* NL summary toast */}
@@ -239,6 +242,8 @@ export default function Home() {
             onToggleEpaSites={handleToggleEpaSites}
             showFloodZones={showFloodZones}
             onToggleFloodZones={handleToggleFloodZones}
+            showFrackingSites={showFrackingSites}
+            onToggleFrackingSites={handleToggleFrackingSites}
             onNLResult={handleNLResult}
           />
         </div>
