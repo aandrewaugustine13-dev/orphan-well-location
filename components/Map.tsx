@@ -370,13 +370,12 @@ export default function Map({
     async function loadFemaZones() {
       if (!supabase) return;
 
-      const bboxWkt = `SRID=4326;POLYGON((${bounds.minLng} ${bounds.minLat}, ${bounds.maxLng} ${bounds.minLat}, ${bounds.maxLng} ${bounds.maxLat}, ${bounds.minLng} ${bounds.maxLat}, ${bounds.minLng} ${bounds.minLat}))`;
-
-      const { data, error } = await supabase
-        .from("fema_flood_zones")
-        .select("zone_id, zone_type, state_fips, geom")
-        .filter("geom", "st_intersects", bboxWkt)
-        .limit(200);
+      const { data, error } = await supabase.rpc('get_fema_zones_in_bbox', {
+        min_lng: bounds.minLng,
+        min_lat: bounds.minLat,
+        max_lng: bounds.maxLng,
+        max_lat: bounds.maxLat
+      });
 
       if (requestId !== femaRequestIdRef.current) return;
       if (error) {
