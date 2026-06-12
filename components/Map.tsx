@@ -48,6 +48,8 @@ interface MapProps {
   showFloodZones: boolean;
   showFrackingSites: boolean;
   showRiskHeatmap: boolean;
+  activeRegions: string[];
+  activeFips: string[];
 }
 
 export interface HeatmapPoint {
@@ -240,6 +242,8 @@ export default function Map({
   showFloodZones: showFemaFloodZones,
   showFrackingSites,
   showRiskHeatmap,
+  activeRegions,
+  activeFips,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);

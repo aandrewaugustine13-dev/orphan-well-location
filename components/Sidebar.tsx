@@ -38,6 +38,8 @@ interface SidebarProps {
   onToggleFrackingSites: () => void;
   showRiskHeatmap: boolean;
   onToggleRiskHeatmap: () => void;
+  activeRegions: string[];
+  onToggleRegion: (region: string) => void;
   onNLResult: (result: NLResult) => void;
 }
 
@@ -67,6 +69,8 @@ export default function Sidebar({
   onToggleFrackingSites,
   showRiskHeatmap,
   onToggleRiskHeatmap,
+  activeRegions,
+  onToggleRegion,
   onNLResult,
 }: SidebarProps) {
   const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);
@@ -327,6 +331,40 @@ export default function Sidebar({
                   />
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Active Regions */}
+          <div>
+            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">ACTIVE REGIONS</div>
+            <div className="flex flex-col gap-2.5">
+              {[
+                { id: "TX", name: "TEXAS (TX)" },
+                { id: "CO", name: "COLORADO (CO)" },
+                { id: "NM", name: "NEW MEXICO (NM)" },
+                { id: "WY", name: "WYOMING (WY)" }
+              ].map((r) => {
+                const isActive = activeRegions.includes(r.id);
+                return (
+                  <div key={r.id} className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono tracking-wider text-zinc-400">{r.name}</span>
+                    <button
+                      onClick={() => onToggleRegion(r.id)}
+                      className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                        isActive ? 'bg-blue-600' : 'bg-zinc-800'
+                      }`}
+                      role="switch"
+                      aria-checked={isActive}
+                    >
+                      <span
+                        className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                          isActive ? 'translate-x-5.5' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>

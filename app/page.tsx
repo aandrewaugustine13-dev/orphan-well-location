@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import LandingOverlay from "@/components/LandingOverlay";
 import { Well, ColorMode } from "@/utils/supabase";
@@ -16,8 +16,21 @@ function radiusToZoom(miles: number): number {
   return 7;
 }
 
+const STATE_FIPS: Record<string, string> = { "TX": "48", "CO": "08", "NM": "35", "WY": "56" };
+
 export default function Home() {
   const [showLanding, setShowLanding] = useState(true);
+  const [activeRegions, setActiveRegions] = useState<string[]>(["TX"]);
+
+  const handleToggleRegion = useCallback((region: string) => {
+    setActiveRegions((prev) =>
+      prev.includes(region) ? prev.filter((r) => r !== region) : [...prev, region]
+    );
+  }, []);
+
+  const activeFips = useMemo(() => {
+    return activeRegions.map((r) => STATE_FIPS[r]).filter(Boolean);
+  }, [activeRegions]);
   const [wells, setWells] = useState<Well[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -164,6 +177,8 @@ export default function Home() {
           showFloodZones={showFloodZones}
           showFrackingSites={showFrackingSites}
           showRiskHeatmap={showRiskHeatmap}
+          activeRegions={activeRegions}
+          activeFips={activeFips}
         />
 
         {/* NL summary toast */}
@@ -249,6 +264,8 @@ export default function Home() {
             onToggleFrackingSites={handleToggleFrackingSites}
             showRiskHeatmap={showRiskHeatmap}
             onToggleRiskHeatmap={handleToggleRiskHeatmap}
+            activeRegions={activeRegions}
+            onToggleRegion={handleToggleRegion}
             onNLResult={handleNLResult}
           />
         </div>
