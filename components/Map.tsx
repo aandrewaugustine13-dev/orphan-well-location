@@ -127,7 +127,7 @@ function MapController({
   onMoveEnd,
 }: {
   programmaticMove: ProgrammaticMove | null;
-  onMoveEnd: (bounds: MapBounds, center: [number, number]) => void;
+  onMoveEnd: (bounds: MapBounds, center: [number, number], zoom: number) => void;
 }) {
   const map = useMap();
   const onMoveEndRef = useRef(onMoveEnd);
@@ -139,7 +139,8 @@ function MapController({
     const c = map.getCenter();
     onMoveEndRef.current(
       { minLat: b.getSouth(), maxLat: b.getNorth(), minLng: b.getWest(), maxLng: b.getEast() },
-      [c.lat, c.lng]
+      [c.lat, c.lng],
+      map.getZoom()
     );
   }, [map]);
 
@@ -158,7 +159,8 @@ function MapController({
       const c = e.target.getCenter();
       onMoveEndRef.current(
         { minLat: b.getSouth(), maxLat: b.getNorth(), minLng: b.getWest(), maxLng: b.getEast() },
-        [c.lat, c.lng]
+        [c.lat, c.lng],
+        e.target.getZoom()
       );
     },
   });
@@ -250,6 +252,7 @@ export default function Map({
   const [femaData, setFemaData] = useState<FemaZone[]>([]);
   const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
+  const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -263,6 +266,12 @@ export default function Map({
   // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
   useEffect(() => {
     if (!showRiskHeatmap || !queryBounds) {
+      setHeatmapData([]);
+      return;
+    }
+
+    // Zoom Guardrail: Do not fire the Supabase RPC if zoom level is less than 9
+    if (zoom < 9) {
       setHeatmapData([]);
       return;
     }
@@ -291,11 +300,12 @@ export default function Map({
     }
 
     loadRiskHeatmap();
-  }, [queryBounds, showRiskHeatmap]);
+  }, [queryBounds, showRiskHeatmap, zoom]);
 
   const handleMoveEnd = useCallback(
-    (bounds: MapBounds, center: [number, number]) => {
+    (bounds: MapBounds, center: [number, number], zoom: number) => {
       onCenterChange(center[0], center[1]);
+      setZoom(zoom);
       if (fetchDebounceRef.current) clearTimeout(fetchDebounceRef.current);
       fetchDebounceRef.current = setTimeout(() => {
         setQueryBounds(bounds);
