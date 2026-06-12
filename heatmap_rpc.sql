@@ -1,5 +1,5 @@
 -- PostGIS RPC: Calculate environmental liability risk intensity (1-10) entirely on the server.
--- Optimized with server-side decimation using ST_SnapToGrid to prevent browser crashes when zoomed out.
+-- Optimized with server-side decimation using ST_SnapToGrid and explicit column aliases.
 -- Run this in your Supabase SQL Editor.
 
 CREATE OR REPLACE FUNCTION get_risk_heatmap_data(
@@ -44,16 +44,22 @@ LANGUAGE sql STABLE AS $$
           ),
           0.0
         )
-      ) AS intensity
+      ) AS score
     FROM orphan_wells w
     WHERE w.latitude BETWEEN min_lat AND max_lat
       AND w.longitude BETWEEN min_lng AND max_lng
+  ),
+  snapped_wells AS (
+    SELECT 
+      ST_SnapToGrid(geom, 0.01) AS snapped_geom,
+      score
+    FROM scored_wells
   )
   SELECT 
-    ST_X(ST_SnapToGrid(geom, 0.01)) AS longitude,
-    ST_Y(ST_SnapToGrid(geom, 0.01)) AS latitude,
-    MAX(intensity) AS intensity
-  FROM scored_wells
-  GROUP BY ST_SnapToGrid(geom, 0.01)
+    ST_X(snapped_geom) AS longitude, 
+    ST_Y(snapped_geom) AS latitude, 
+    MAX(score) AS intensity
+  FROM snapped_wells
+  GROUP BY snapped_geom
   LIMIT 5000;
 $$;
