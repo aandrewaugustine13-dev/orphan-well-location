@@ -249,64 +249,7 @@ export default function Map({
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
   const [femaData, setFemaData] = useState<FemaZone[]>([]);
   const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
-
-  const heatmapData = useMemo<HeatmapPoint[]>(() => {
-    if (!showRiskHeatmap || wells.length === 0) return [];
-
-    return wells.map((well) => {
-      let score = 2; // Baseline score
-
-      // 1. Proximity to groundwater wells
-      if (groundwaterWells.length > 0) {
-        let minDistance = Infinity;
-        for (const gw of groundwaterWells) {
-          const dist = haversineMiles(well.latitude, well.longitude, gw.latitude, gw.longitude);
-          if (dist < minDistance) {
-            minDistance = dist;
-          }
-        }
-        if (minDistance <= 1.0) {
-          score += 5;
-        } else if (minDistance <= 3.0) {
-          score += 3;
-        } else if (minDistance <= 5.0) {
-          score += 1;
-        }
-      }
-
-      // 2. Proximity to FEMA flood zones
-      if (femaData.length > 0) {
-        let closeToFlood = false;
-        for (const zone of femaData) {
-          if (zone.geom && zone.geom.coordinates) {
-            const coords = zone.geom.coordinates[0];
-            if (Array.isArray(coords)) {
-              for (let i = 0; i < Math.min(coords.length, 10); i++) {
-                const pt = coords[i];
-                if (Array.isArray(pt) && pt.length >= 2) {
-                  const dist = haversineMiles(well.latitude, well.longitude, pt[1], pt[0]);
-                  if (dist <= 0.75) {
-                    closeToFlood = true;
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          if (closeToFlood) break;
-        }
-        if (closeToFlood) {
-          score += 3;
-        }
-      }
-
-      return {
-        longitude: well.longitude,
-        latitude: well.latitude,
-        intensity: Math.min(10, Math.max(1, score)),
-      };
-    });
-  }, [showRiskHeatmap, wells, groundwaterWells, femaData]);
+  const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -314,7 +257,41 @@ export default function Map({
   const epaRequestIdRef = useRef(0);
   const femaRequestIdRef = useRef(0);
   const frackingRequestIdRef = useRef(0);
+  const heatmapRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
+
+  // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
+  useEffect(() => {
+    if (!showRiskHeatmap || !queryBounds) {
+      setHeatmapData([]);
+      return;
+    }
+
+    const requestId = ++heatmapRequestIdRef.current;
+    const bounds = queryBounds;
+
+    async function loadRiskHeatmap() {
+      if (!supabase) return;
+
+      const { data, error } = await supabase.rpc("get_risk_heatmap_data", {
+        min_lng: bounds.minLng,
+        min_lat: bounds.minLat,
+        max_lng: bounds.maxLng,
+        max_lat: bounds.maxLat,
+      });
+
+      if (requestId !== heatmapRequestIdRef.current) return;
+
+      if (error) {
+        console.error("Error fetching risk heatmap data:", error);
+        return;
+      }
+
+      setHeatmapData((data as HeatmapPoint[]) ?? []);
+    }
+
+    loadRiskHeatmap();
+  }, [queryBounds, showRiskHeatmap]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number]) => {
