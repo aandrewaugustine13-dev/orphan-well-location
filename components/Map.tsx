@@ -269,52 +269,41 @@ export default function Map({
 
   // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
   useEffect(() => {
-    if (!showRiskHeatmap || !queryBounds) {
-      setHeatmapData([]);
-      return;
-    }
-
-    // Zero State Guardrail: if no regions are active, do not fetch
-    if (activeRegions.length === 0) {
-      setHeatmapData([]);
-      return;
-    }
-
-    // Zoom Guardrail: Do not fire the Supabase RPC if zoom level is less than 9
-    if (zoom < 9) {
-      setHeatmapData([]);
-      return;
-    }
-
-    const requestId = ++heatmapRequestIdRef.current;
-    const bounds = queryBounds;
-
     async function loadRiskHeatmap() {
-      if (!supabase) return;
-
-      const { data, error } = await supabase.rpc("get_risk_heatmap_data", {
-        min_lng: bounds.minLng,
-        min_lat: bounds.minLat,
-        max_lng: bounds.maxLng,
-        max_lat: bounds.maxLat,
-        active_states: activeRegions,
-        active_fips: activeFips,
-      });
-
-      if (requestId !== heatmapRequestIdRef.current) return;
-
-      if (error) {
-        console.error("Error fetching risk heatmap data:", error);
+      // 1. The Guardrail: If no regions are active, clear the map and stop.
+      if (!showRiskHeatmap || !queryBounds || activeRegions.length === 0) {
+        setHeatmapData([]);
         return;
       }
 
-      const heatmapPoints = (data as HeatmapPoint[]) ?? [];
-      console.log("Heatmap Data Payload:", heatmapPoints.slice(0, 2));
-      setHeatmapData(heatmapPoints);
+      try {
+        if (!supabase) return;
+        // 2. The Fetch: Explicitly passing the arrays Supabase expects
+        const { data, error } = await supabase.rpc("get_risk_heatmap_data", {
+          min_lng: queryBounds.minLng,
+          min_lat: queryBounds.minLat,
+          max_lng: queryBounds.maxLng,
+          max_lat: queryBounds.maxLat,
+          active_states: activeRegions, // e.g., ["TX", "AR"]
+          active_fips: activeFips       // e.g., ["48", "05"]
+        });
+
+        if (error) {
+          console.error("Supabase RPC Error:", error);
+          return;
+        }
+
+        const heatmapPoints = (data as HeatmapPoint[]) ?? [];
+        console.log("Heatmap Data Payload:", heatmapPoints.slice(0, 2));
+        setHeatmapData(heatmapPoints);
+        
+      } catch (err) {
+        console.error("Network or parsing error:", err);
+      }
     }
 
     loadRiskHeatmap();
-  }, [queryBounds, showRiskHeatmap, zoom, activeRegions, activeFips]);
+  }, [showRiskHeatmap, queryBounds, activeRegions, activeFips]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number], zoom: number) => {
