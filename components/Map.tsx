@@ -191,16 +191,14 @@ function DeckGLOverlay({
   useEffect(() => {
     if (!showRiskHeatmap) return;
 
-    // Radius scaling based on zoom: roughly representing 1/4 mile to 150 feet in real world
-    const radiusPixels = Math.max(3, Math.min(100, 3 * Math.pow(1.35, zoom - 5)));
-
     const layers = [
       new HeatmapLayer({
         id: "liability-heatmap",
         data: heatmapData,
         getPosition: (d: any) => [d.longitude, d.latitude],
-        getWeight: (d: any) => d.intensity,
-        radiusPixels,
+        getWeight: (d: any) => Number(d.intensity || 1),
+        radiusPixels: 40,
+        aggregation: "SUM",
         colorRange: [
           [0, 34, 150],    // deep blue
           [0, 150, 214],   // cyan-blue
@@ -296,7 +294,9 @@ export default function Map({
         return;
       }
 
-      setHeatmapData((data as HeatmapPoint[]) ?? []);
+      const heatmapPoints = (data as HeatmapPoint[]) ?? [];
+      console.log("Heatmap Data Payload:", heatmapPoints.slice(0, 2));
+      setHeatmapData(heatmapPoints);
     }
 
     loadRiskHeatmap();
