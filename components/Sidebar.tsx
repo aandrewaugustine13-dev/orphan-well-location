@@ -36,6 +36,8 @@ interface SidebarProps {
   onToggleFloodZones: () => void;
   showFrackingSites: boolean;
   onToggleFrackingSites: () => void;
+  showRiskHeatmap: boolean;
+  onToggleRiskHeatmap: () => void;
   onNLResult: (result: NLResult) => void;
 }
 
@@ -63,6 +65,8 @@ export default function Sidebar({
   onToggleFloodZones,
   showFrackingSites,
   onToggleFrackingSites,
+  showRiskHeatmap,
+  onToggleRiskHeatmap,
   onNLResult,
 }: SidebarProps) {
   const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);
@@ -306,6 +310,23 @@ export default function Sidebar({
                   />
                 </button>
               </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">RISK HEATMAP (DECK.GL)</span>
+                <button
+                  onClick={onToggleRiskHeatmap}
+                  className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
+                    showRiskHeatmap ? 'bg-red-600' : 'bg-zinc-800'
+                  }`}
+                  role="switch"
+                  aria-checked={showRiskHeatmap}
+                >
+                  <span
+                    className={`inline-block h-2.5 w-2.5 transform rounded-full bg-white transition-transform duration-200 ${
+                      showRiskHeatmap ? 'translate-x-5.5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -453,6 +474,10 @@ export default function Sidebar({
             <div className="flex items-center gap-1.5 col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
               <div className="w-2.5 h-2 rounded-sm" style={{ background: "#0284c7", border: "1px solid #38bdf8" }} />
               <span className="text-[10px] text-zinc-500 font-mono tracking-wider">FEMA FLOOD ZONE</span>
+            </div>
+            <div className="flex items-center gap-1.5 col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
+              <div className="w-12 h-2 rounded-sm" style={{ background: "linear-gradient(to right, #002296, #0096d6, #78d600, #ffe600, #ff6400, #ff0000)" }} />
+              <span className="text-[10px] text-zinc-500 font-mono tracking-wider">ENVIRONMENTAL RISK INDEX</span>
             </div>
           </div>
         </div>

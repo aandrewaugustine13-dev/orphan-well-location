@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CircleMarker,
   GeoJSON,
@@ -12,6 +12,8 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
+import { DeckOverlay } from "@deck.gl-community/leaflet";
+import { HeatmapLayer } from "@deck.gl/aggregation-layers";
 import {
   ColorMode,
   Well,
@@ -45,6 +47,13 @@ interface MapProps {
   showEpaSites: boolean;
   showFloodZones: boolean;
   showFrackingSites: boolean;
+  showRiskHeatmap: boolean;
+}
+
+export interface HeatmapPoint {
+  longitude: number;
+  latitude: number;
+  intensity: number;
 }
 
 interface ProgrammaticMove {
@@ -157,7 +166,62 @@ function MapController({
   return null;
 }
 
+function DeckGLOverlay({
+  showRiskHeatmap,
+  heatmapData,
+}: {
+  showRiskHeatmap: boolean;
+  heatmapData: HeatmapPoint[];
+}) {
+  const map = useMap();
+  const [zoom, setZoom] = useState(map.getZoom());
 
+  useEffect(() => {
+    const handleZoom = () => {
+      setZoom(map.getZoom());
+    };
+    map.on("zoomend", handleZoom);
+    return () => {
+      map.off("zoomend", handleZoom);
+    };
+  }, [map]);
+
+  useEffect(() => {
+    if (!showRiskHeatmap) return;
+
+    // Radius scaling based on zoom: roughly representing 1/4 mile to 150 feet in real world
+    const radiusPixels = Math.max(3, Math.min(100, 3 * Math.pow(1.35, zoom - 5)));
+
+    const layers = [
+      new HeatmapLayer({
+        id: "liability-heatmap",
+        data: heatmapData,
+        getPosition: (d: any) => [d.longitude, d.latitude],
+        getWeight: (d: any) => d.intensity,
+        radiusPixels,
+        colorRange: [
+          [0, 34, 150],    // deep blue
+          [0, 150, 214],   // cyan-blue
+          [120, 214, 0],   // green-yellow
+          [255, 230, 0],   // yellow
+          [255, 100, 0],   // orange
+          [255, 0, 0],     // glowing red
+        ],
+        intensity: 1,
+        threshold: 0.03,
+      }),
+    ];
+
+    const deckOverlay = new DeckOverlay({ layers });
+    map.addLayer(deckOverlay);
+
+    return () => {
+      map.removeLayer(deckOverlay);
+    };
+  }, [map, zoom, showRiskHeatmap, heatmapData]);
+
+  return null;
+}
 
 export default function Map({
   onWellsLoaded,
@@ -175,6 +239,7 @@ export default function Map({
   showEpaSites,
   showFloodZones: showFemaFloodZones,
   showFrackingSites,
+  showRiskHeatmap,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
@@ -184,6 +249,64 @@ export default function Map({
   const [epaSites, setEpaSites] = useState<EpaSite[]>([]);
   const [femaData, setFemaData] = useState<FemaZone[]>([]);
   const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
+
+  const heatmapData = useMemo<HeatmapPoint[]>(() => {
+    if (!showRiskHeatmap || wells.length === 0) return [];
+
+    return wells.map((well) => {
+      let score = 2; // Baseline score
+
+      // 1. Proximity to groundwater wells
+      if (groundwaterWells.length > 0) {
+        let minDistance = Infinity;
+        for (const gw of groundwaterWells) {
+          const dist = haversineMiles(well.latitude, well.longitude, gw.latitude, gw.longitude);
+          if (dist < minDistance) {
+            minDistance = dist;
+          }
+        }
+        if (minDistance <= 1.0) {
+          score += 5;
+        } else if (minDistance <= 3.0) {
+          score += 3;
+        } else if (minDistance <= 5.0) {
+          score += 1;
+        }
+      }
+
+      // 2. Proximity to FEMA flood zones
+      if (femaData.length > 0) {
+        let closeToFlood = false;
+        for (const zone of femaData) {
+          if (zone.geom && zone.geom.coordinates) {
+            const coords = zone.geom.coordinates[0];
+            if (Array.isArray(coords)) {
+              for (let i = 0; i < Math.min(coords.length, 10); i++) {
+                const pt = coords[i];
+                if (Array.isArray(pt) && pt.length >= 2) {
+                  const dist = haversineMiles(well.latitude, well.longitude, pt[1], pt[0]);
+                  if (dist <= 0.75) {
+                    closeToFlood = true;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+          if (closeToFlood) break;
+        }
+        if (closeToFlood) {
+          score += 3;
+        }
+      }
+
+      return {
+        longitude: well.longitude,
+        latitude: well.latitude,
+        intensity: Math.min(10, Math.max(1, score)),
+      };
+    });
+  }, [showRiskHeatmap, wells, groundwaterWells, femaData]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -448,6 +571,10 @@ export default function Map({
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; CARTO'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
+
+        {showRiskHeatmap && (
+          <DeckGLOverlay showRiskHeatmap={showRiskHeatmap} heatmapData={heatmapData} />
+        )}
 
         {showFemaFloodZones && femaData.map((zone) => (
           <GeoJSON
