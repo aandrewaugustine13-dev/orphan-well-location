@@ -6,6 +6,7 @@ import {
   getWellColor,
   getWellAgeYears,
   formatWellAge,
+  STATE_FIPS,
 } from "@/utils/supabase";
 import AddressSearch from "@/components/AddressSearch";
 import NLSearchBar, { NLResult } from "@/components/NLSearchBar";
@@ -337,19 +338,16 @@ export default function Sidebar({
           {/* Active Regions */}
           <div>
             <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">ACTIVE REGIONS</div>
-            <div className="flex flex-col gap-2.5">
-              {[
-                { id: "TX", name: "TEXAS (TX)" },
-                { id: "CO", name: "COLORADO (CO)" },
-                { id: "NM", name: "NEW MEXICO (NM)" },
-                { id: "WY", name: "WYOMING (WY)" }
-              ].map((r) => {
-                const isActive = activeRegions.includes(r.id);
+            <div className="max-h-60 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+              {Object.entries(STATE_FIPS).map(([id, state]) => {
+                const isActive = activeRegions.includes(id);
                 return (
-                  <div key={r.id} className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono tracking-wider text-zinc-400">{r.name}</span>
+                  <div key={id} className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono tracking-wider text-zinc-400">
+                      {state.name} ({id})
+                    </span>
                     <button
-                      onClick={() => onToggleRegion(r.id)}
+                      onClick={() => onToggleRegion(id)}
                       className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
                         isActive ? 'bg-blue-600' : 'bg-zinc-800'
                       }`}

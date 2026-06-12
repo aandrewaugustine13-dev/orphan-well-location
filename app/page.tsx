@@ -4,7 +4,7 @@ import dynamic from "next/dynamic";
 import { useState, useCallback, useMemo } from "react";
 import Sidebar from "@/components/Sidebar";
 import LandingOverlay from "@/components/LandingOverlay";
-import { Well, ColorMode } from "@/utils/supabase";
+import { Well, ColorMode, STATE_FIPS } from "@/utils/supabase";
 import { NLResult } from "@/components/NLSearchBar";
 
 const Map = dynamic(() => import("@/components/Map"), { ssr: false });
@@ -15,8 +15,6 @@ function radiusToZoom(miles: number): number {
   if (miles <= 200) return 8;
   return 7;
 }
-
-const STATE_FIPS: Record<string, string> = { "TX": "48", "CO": "08", "NM": "35", "WY": "56" };
 
 export default function Home() {
   const [showLanding, setShowLanding] = useState(true);
@@ -29,7 +27,7 @@ export default function Home() {
   }, []);
 
   const activeFips = useMemo(() => {
-    return activeRegions.map((r) => STATE_FIPS[r]).filter(Boolean);
+    return activeRegions.map((r) => STATE_FIPS[r]?.fips).filter(Boolean);
   }, [activeRegions]);
   const [wells, setWells] = useState<Well[]>([]);
   const [loading, setLoading] = useState(true);
