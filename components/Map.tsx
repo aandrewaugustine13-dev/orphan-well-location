@@ -22,7 +22,6 @@ import {
   getWellAgeRadius,
   getWellColor,
   supabase,
-  STATE_FIPS,
 } from "@/utils/supabase";
 
 interface MapBounds {
@@ -125,9 +124,7 @@ function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function toTitleCase(str: string): string {
-  return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
-}
+
 
 function MapController({
   programmaticMove,
@@ -260,10 +257,6 @@ export default function Map({
   const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
-
-  const activeStateNames = useMemo(() => {
-    return activeRegions.map((r) => toTitleCase(STATE_FIPS[r]?.name ?? "")).filter(Boolean);
-  }, [activeRegions]);
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -403,7 +396,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeStateNames)
+        .in("state", activeRegions)
         .limit(5000);
 
       if (requestId !== requestIdRef.current) return;
@@ -420,7 +413,7 @@ export default function Map({
     }
 
     loadWells();
-  }, [queryBounds, onError, onLoadingChange, activeRegions, activeStateNames]);
+  }, [queryBounds, onError, onLoadingChange, activeRegions]);
 
   // Enrich wells with distance from the searched location (cheap, no re-fetch)
   useEffect(() => {
@@ -460,7 +453,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeStateNames)
+        .in("state", activeRegions)
         .limit(5000);
 
       if (requestId !== gwRequestIdRef.current) return;
@@ -481,7 +474,7 @@ export default function Map({
     }
 
     loadGroundwater();
-  }, [queryBounds, showGroundwater, searchedLocation, activeRegions, activeStateNames]);
+  }, [queryBounds, showGroundwater, searchedLocation, activeRegions]);
 
   // Fetch EPA sites within the current viewport bounds
   useEffect(() => {
@@ -509,7 +502,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeStateNames)
+        .in("state", activeRegions)
         .limit(2000);
 
       if (requestId !== epaRequestIdRef.current) return;
@@ -522,7 +515,7 @@ export default function Map({
     }
 
     loadEpaSites();
-  }, [queryBounds, showEpaSites, activeRegions, activeStateNames]);
+  }, [queryBounds, showEpaSites, activeRegions]);
 
   // Fetch FEMA flood zones within the current viewport bounds
   useEffect(() => {
