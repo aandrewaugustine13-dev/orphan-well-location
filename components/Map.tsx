@@ -197,7 +197,7 @@ function DeckGLOverlay({
         data: heatmapData,
         getPosition: (d: any) => [d.longitude, d.latitude],
         getWeight: (d: any) => Number(d.intensity || 1),
-        radiusPixels: 40,
+        radiusPixels: 90,
         aggregation: "SUM",
         colorRange: [
           [0, 34, 150],    // deep blue
@@ -207,7 +207,7 @@ function DeckGLOverlay({
           [255, 100, 0],   // orange
           [255, 0, 0],     // glowing red
         ],
-        intensity: 1,
+        intensity: 1.5,
         threshold: 0.03,
       }),
     ];

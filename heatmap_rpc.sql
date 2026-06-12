@@ -51,7 +51,7 @@ LANGUAGE sql STABLE AS $$
   ),
   snapped_wells AS (
     SELECT 
-      ST_SnapToGrid(geom, 0.01) AS snapped_geom,
+      ST_SnapToGrid(geom, 0.003) AS snapped_geom,
       score
     FROM scored_wells
   )
