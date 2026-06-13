@@ -272,6 +272,10 @@ export default function Map({
   // every Supabase state filter must go through this translation.
   const dbStates = useMemo(() => regionsToDbStates(activeRegions), [activeRegions]);
 
+  const activeStateNames = useMemo(() => {
+    return activeRegions.map(abbr => STATE_FIPS[abbr]?.name).filter(Boolean);
+  }, [activeRegions]);
+
   const activeFips = useMemo(() => {
     return activeRegions.map(regionAbbr => STATE_FIPS[regionAbbr]?.fips).filter(Boolean);
   }, [activeRegions]);
@@ -295,8 +299,8 @@ export default function Map({
           min_lat: queryBounds.minLat,
           max_lng: queryBounds.maxLng,
           max_lat: queryBounds.maxLat,
-          active_states: activeRegions, // This now correctly holds ["TX", "CO", etc.]
-          active_fips: activeFips
+          active_states: activeStateNames, // Now passes ["Texas", "California"]
+          active_fips: activeFips          // Unchanged
         });
 
         if (requestId !== heatmapRequestIdRef.current) return;
@@ -313,7 +317,7 @@ export default function Map({
     }
 
     loadRiskHeatmap();
-  }, [showRiskHeatmap, queryBounds, activeRegions, activeFips]);
+  }, [showRiskHeatmap, queryBounds, activeStateNames, activeFips]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number], zoom: number) => {
@@ -369,7 +373,7 @@ export default function Map({
     if (!queryBounds) return;
 
     // Zero State Guardrail
-    if (dbStates.length === 0) {
+    if (activeRegions.length === 0) {
       setRawWells([]);
       return;
     }
@@ -395,7 +399,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", dbStates)
+        .in("state", activeStateNames)
         .limit(5000);
 
       if (requestId !== requestIdRef.current) return;
@@ -412,7 +416,7 @@ export default function Map({
     }
 
     loadWells();
-  }, [queryBounds, onError, onLoadingChange, dbStates]);
+  }, [queryBounds, onError, onLoadingChange, activeStateNames]);
 
   // Enrich wells with distance from the searched location (cheap, no re-fetch)
   useEffect(() => {
@@ -434,7 +438,7 @@ export default function Map({
     }
 
     // Zero State Guardrail
-    if (dbStates.length === 0) {
+    if (activeRegions.length === 0) {
       setGroundwaterWells([]);
       return;
     }
@@ -452,7 +456,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", dbStates)
+        .in("state", activeStateNames)
         .limit(5000);
 
       if (requestId !== gwRequestIdRef.current) return;
@@ -473,7 +477,7 @@ export default function Map({
     }
 
     loadGroundwater();
-  }, [queryBounds, showGroundwater, searchedLocation, dbStates]);
+  }, [queryBounds, showGroundwater, searchedLocation, activeStateNames]);
 
   // Fetch EPA sites within the current viewport bounds
   useEffect(() => {
@@ -483,7 +487,7 @@ export default function Map({
     }
 
     // Zero State Guardrail
-    if (dbStates.length === 0) {
+    if (activeRegions.length === 0) {
       setEpaSites([]);
       return;
     }
@@ -501,7 +505,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", dbStates)
+        .in("state", activeStateNames)
         .limit(2000);
 
       if (requestId !== epaRequestIdRef.current) return;
@@ -514,7 +518,7 @@ export default function Map({
     }
 
     loadEpaSites();
-  }, [queryBounds, showEpaSites, dbStates]);
+  }, [queryBounds, showEpaSites, activeStateNames]);
 
   // Fetch FEMA flood zones within the current viewport bounds
   useEffect(() => {
