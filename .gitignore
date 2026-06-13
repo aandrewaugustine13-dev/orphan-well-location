@@ -42,3 +42,10 @@ next-env.d.ts
 *.html
 test-*.js
 robust-download.js
+
+# python
+__pycache__/
+*.pyc
+
+# logs
+*.log
