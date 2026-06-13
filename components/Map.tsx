@@ -23,6 +23,7 @@ import {
   getWellColor,
   regionsToDbStates,
   supabase,
+  STATE_FIPS,
 } from "@/utils/supabase";
 
 interface MapBounds {
@@ -246,7 +247,6 @@ export default function Map({
   showFrackingSites,
   showRiskHeatmap,
   activeRegions,
-  activeFips,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
   const [programmaticMove, setProgrammaticMove] = useState<ProgrammaticMove | null>(null);
@@ -272,11 +272,15 @@ export default function Map({
   // every Supabase state filter must go through this translation.
   const dbStates = useMemo(() => regionsToDbStates(activeRegions), [activeRegions]);
 
+  const activeFips = useMemo(() => {
+    return activeRegions.map(regionAbbr => STATE_FIPS[regionAbbr]?.fips).filter(Boolean);
+  }, [activeRegions]);
+
   // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
   useEffect(() => {
     async function loadRiskHeatmap() {
       // 1. The Guardrail: If no regions are active, clear the map and stop.
-      if (!showRiskHeatmap || !queryBounds || dbStates.length === 0) {
+      if (!showRiskHeatmap || !queryBounds || activeRegions.length === 0) {
         setHeatmapData([]);
         return;
       }
@@ -291,8 +295,8 @@ export default function Map({
           min_lat: queryBounds.minLat,
           max_lng: queryBounds.maxLng,
           max_lat: queryBounds.maxLat,
-          active_states: dbStates, // e.g., ["TX", "Texas", "AR", "Arkansas"]
-          active_fips: activeFips  // e.g., ["48", "05"]
+          active_states: activeRegions, // This now correctly holds ["TX", "CO", etc.]
+          active_fips: activeFips
         });
 
         if (requestId !== heatmapRequestIdRef.current) return;
@@ -309,7 +313,7 @@ export default function Map({
     }
 
     loadRiskHeatmap();
-  }, [showRiskHeatmap, queryBounds, dbStates, activeFips]);
+  }, [showRiskHeatmap, queryBounds, activeRegions, activeFips]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number], zoom: number) => {
