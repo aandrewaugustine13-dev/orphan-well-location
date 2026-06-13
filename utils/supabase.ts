@@ -103,3 +103,17 @@ export function getWellAgeRadius(well: Well, isSelected: boolean): number {
 export const STATE_FIPS: Record<string, { name: string; fips: string }> = {
   AL: { name: "ALABAMA", fips: "01" }, AK: { name: "ALASKA", fips: "02" }, AZ: { name: "ARIZONA", fips: "04" }, AR: { name: "ARKANSAS", fips: "05" }, CA: { name: "CALIFORNIA", fips: "06" }, CO: { name: "COLORADO", fips: "08" }, CT: { name: "CONNECTICUT", fips: "09" }, DE: { name: "DELAWARE", fips: "10" }, FL: { name: "FLORIDA", fips: "12" }, GA: { name: "GEORGIA", fips: "13" }, HI: { name: "HAWAII", fips: "15" }, ID: { name: "IDAHO", fips: "16" }, IL: { name: "ILLINOIS", fips: "17" }, IN: { name: "INDIANA", fips: "18" }, IA: { name: "IOWA", fips: "19" }, KS: { name: "KANSAS", fips: "20" }, KY: { name: "KENTUCKY", fips: "21" }, LA: { name: "LOUISIANA", fips: "22" }, ME: { name: "MAINE", fips: "23" }, MD: { name: "MARYLAND", fips: "24" }, MA: { name: "MASSACHUSETTS", fips: "25" }, MI: { name: "MICHIGAN", fips: "26" }, MN: { name: "MINNESOTA", fips: "27" }, MS: { name: "MISSISSIPPI", fips: "28" }, MO: { name: "MISSOURI", fips: "29" }, MT: { name: "MONTANA", fips: "30" }, NE: { name: "NEBRASKA", fips: "31" }, NV: { name: "NEVADA", fips: "32" }, NH: { name: "NEW HAMPSHIRE", fips: "33" }, NJ: { name: "NEW JERSEY", fips: "34" }, NM: { name: "NEW MEXICO", fips: "35" }, NY: { name: "NEW YORK", fips: "36" }, NC: { name: "NORTH CAROLINA", fips: "37" }, ND: { name: "NORTH DAKOTA", fips: "38" }, OH: { name: "OHIO", fips: "39" }, OK: { name: "OKLAHOMA", fips: "40" }, OR: { name: "OREGON", fips: "41" }, PA: { name: "PENNSYLVANIA", fips: "42" }, RI: { name: "RHODE ISLAND", fips: "44" }, SC: { name: "SOUTH CAROLINA", fips: "45" }, SD: { name: "SOUTH DAKOTA", fips: "46" }, TN: { name: "TENNESSEE", fips: "47" }, TX: { name: "TEXAS", fips: "48" }, UT: { name: "UTAH", fips: "49" }, VT: { name: "VERMONT", fips: "50" }, VA: { name: "VIRGINIA", fips: "51" }, WA: { name: "WASHINGTON", fips: "53" }, WV: { name: "WEST VIRGINIA", fips: "54" }, WI: { name: "WISCONSIN", fips: "55" }, WY: { name: "WYOMING", fips: "56" }
 };
+
+// The scrapers stored `state` as Title Case full names ("Texas", "New Mexico"),
+// while the UI tracks regions by 2-letter code. Translate at the query boundary,
+// keeping the abbreviation too so rows ingested either way still match.
+export function regionsToDbStates(regions: string[]): string[] {
+  return regions.flatMap((abbr) => {
+    const entry = STATE_FIPS[abbr];
+    if (!entry) return [abbr];
+    const fullName = entry.name
+      .toLowerCase()
+      .replace(/(^|\s)[a-z]/g, (c) => c.toUpperCase());
+    return [abbr, fullName];
+  });
+}

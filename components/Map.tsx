@@ -21,6 +21,7 @@ import {
   formatLiability,
   getWellAgeRadius,
   getWellColor,
+  regionsToDbStates,
   supabase,
 } from "@/utils/supabase";
 
@@ -267,14 +268,20 @@ export default function Map({
   const heatmapRequestIdRef = useRef(0);
   const moveIdRef = useRef(0);
 
+  // The DB stores full state names ("Texas"), the UI tracks codes ("TX");
+  // every Supabase state filter must go through this translation.
+  const dbStates = useMemo(() => regionsToDbStates(activeRegions), [activeRegions]);
+
   // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
   useEffect(() => {
     async function loadRiskHeatmap() {
       // 1. The Guardrail: If no regions are active, clear the map and stop.
-      if (!showRiskHeatmap || !queryBounds || activeRegions.length === 0) {
+      if (!showRiskHeatmap || !queryBounds || dbStates.length === 0) {
         setHeatmapData([]);
         return;
       }
+
+      const requestId = ++heatmapRequestIdRef.current;
 
       try {
         if (!supabase) return;
@@ -284,26 +291,25 @@ export default function Map({
           min_lat: queryBounds.minLat,
           max_lng: queryBounds.maxLng,
           max_lat: queryBounds.maxLat,
-          active_states: activeRegions, // e.g., ["TX", "AR"]
-          active_fips: activeFips       // e.g., ["48", "05"]
+          active_states: dbStates, // e.g., ["TX", "Texas", "AR", "Arkansas"]
+          active_fips: activeFips  // e.g., ["48", "05"]
         });
+
+        if (requestId !== heatmapRequestIdRef.current) return;
 
         if (error) {
           console.error("Supabase RPC Error:", error);
           return;
         }
 
-        const heatmapPoints = (data as HeatmapPoint[]) ?? [];
-        console.log("Heatmap Data Payload:", heatmapPoints.slice(0, 2));
-        setHeatmapData(heatmapPoints);
-        
+        setHeatmapData((data as HeatmapPoint[]) ?? []);
       } catch (err) {
         console.error("Network or parsing error:", err);
       }
     }
 
     loadRiskHeatmap();
-  }, [showRiskHeatmap, queryBounds, activeRegions, activeFips]);
+  }, [showRiskHeatmap, queryBounds, dbStates, activeFips]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number], zoom: number) => {
@@ -359,7 +365,7 @@ export default function Map({
     if (!queryBounds) return;
 
     // Zero State Guardrail
-    if (activeRegions.length === 0) {
+    if (dbStates.length === 0) {
       setRawWells([]);
       return;
     }
@@ -385,7 +391,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeRegions)
+        .in("state", dbStates)
         .limit(5000);
 
       if (requestId !== requestIdRef.current) return;
@@ -402,7 +408,7 @@ export default function Map({
     }
 
     loadWells();
-  }, [queryBounds, onError, onLoadingChange, activeRegions]);
+  }, [queryBounds, onError, onLoadingChange, dbStates]);
 
   // Enrich wells with distance from the searched location (cheap, no re-fetch)
   useEffect(() => {
@@ -424,7 +430,7 @@ export default function Map({
     }
 
     // Zero State Guardrail
-    if (activeRegions.length === 0) {
+    if (dbStates.length === 0) {
       setGroundwaterWells([]);
       return;
     }
@@ -442,7 +448,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeRegions)
+        .in("state", dbStates)
         .limit(5000);
 
       if (requestId !== gwRequestIdRef.current) return;
@@ -463,7 +469,7 @@ export default function Map({
     }
 
     loadGroundwater();
-  }, [queryBounds, showGroundwater, searchedLocation, activeRegions]);
+  }, [queryBounds, showGroundwater, searchedLocation, dbStates]);
 
   // Fetch EPA sites within the current viewport bounds
   useEffect(() => {
@@ -473,7 +479,7 @@ export default function Map({
     }
 
     // Zero State Guardrail
-    if (activeRegions.length === 0) {
+    if (dbStates.length === 0) {
       setEpaSites([]);
       return;
     }
@@ -491,7 +497,7 @@ export default function Map({
         .lte("latitude", bounds.maxLat)
         .gte("longitude", bounds.minLng)
         .lte("longitude", bounds.maxLng)
-        .in("state", activeRegions)
+        .in("state", dbStates)
         .limit(2000);
 
       if (requestId !== epaRequestIdRef.current) return;
@@ -504,7 +510,7 @@ export default function Map({
     }
 
     loadEpaSites();
-  }, [queryBounds, showEpaSites, activeRegions]);
+  }, [queryBounds, showEpaSites, dbStates]);
 
   // Fetch FEMA flood zones within the current viewport bounds
   useEffect(() => {
