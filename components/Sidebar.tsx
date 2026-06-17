@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Well,
   ColorMode,
@@ -39,6 +40,10 @@ interface SidebarProps {
   onToggleFrackingSites: () => void;
   showRiskHeatmap: boolean;
   onToggleRiskHeatmap: () => void;
+  riskThreshold?: number;
+  onRiskThresholdChange?: (v: number) => void;
+  riskError?: string | null;
+  onRiskErrorClear?: () => void;
   activeRegions: string[];
   onToggleRegion: (region: string) => void;
   onNLResult: (result: NLResult) => void;
@@ -70,10 +75,17 @@ export default function Sidebar({
   onToggleFrackingSites,
   showRiskHeatmap,
   onToggleRiskHeatmap,
+  riskThreshold = 0,
+  onRiskThresholdChange,
+  riskError,
+  onRiskErrorClear,
   activeRegions,
   onToggleRegion,
   onNLResult,
 }: SidebarProps) {
+  // Local UI-only filter for the regions list. All 50 toggles and the
+  // activeRegions state machine continue to work exactly as before.
+  const [regionFilter, setRegionFilter] = useState("");
   const oldWells = wells.filter((w) => (getWellAgeYears(w) ?? 0) >= 20);
 
   const sortedWells =
@@ -184,13 +196,17 @@ export default function Sidebar({
         </div>
 
         {/* ── Search & Query ── */}
-        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0 flex flex-col gap-3">
+        <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0 flex flex-col gap-3 ui-panel">
           <div>
-            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2">GEOGRAPHIC SEARCH</div>
+            <div className="ui-section flex items-center gap-1.5">
+              <span>⌖</span> GEOGRAPHIC SEARCH
+            </div>
             <AddressSearch onSelect={(lat, lng, label) => onSearchLocation(lat, lng, label)} />
           </div>
           <div>
-            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-1">NATURAL LANGUAGE QUERY</div>
+            <div className="ui-section flex items-center gap-1.5">
+              <span>✱</span> NATURAL LANGUAGE QUERY
+            </div>
             <NLSearchBar onResult={onNLResult} onError={() => {}} />
           </div>
         </div>
@@ -228,7 +244,9 @@ export default function Sidebar({
 
           {/* Layer Toggles */}
           <div>
-            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">MAP LAYERS</div>
+            <div className="ui-section flex items-center gap-1.5">
+              <span>◉</span> MAP LAYERS
+            </div>
             <div className="flex flex-col gap-2.5">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-mono tracking-wider text-zinc-400">ORPHAN WELLS</span>
@@ -316,7 +334,7 @@ export default function Sidebar({
                 </button>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono tracking-wider text-zinc-400">RISK HEATMAP (DECK.GL)</span>
+                <span className="text-[10px] font-mono tracking-wider text-zinc-400">RISK (HEATMAP + HEX ZONES)</span>
                 <button
                   onClick={onToggleRiskHeatmap}
                   className={`relative inline-flex h-4 w-9 items-center rounded-full transition-colors focus:outline-none ${
@@ -332,14 +350,86 @@ export default function Sidebar({
                   />
                 </button>
               </div>
+
+              {/* Threshold only affects the hex zone outlines. The classic heatmap underlay (density glow) always uses full data. */}
+              {showRiskHeatmap && onRiskThresholdChange && (
+                <div className="pl-1 pt-1">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[9px] text-zinc-500 tracking-widest">MIN HAZARD LEVEL (for hex zones)</div>
+                    <button
+                      onClick={() => onRiskThresholdChange(0)}
+                      className="text-[9px] px-1.5 py-0 border border-zinc-700 hover:border-zinc-500 text-zinc-400 rounded-sm"
+                    >
+                      reset
+                    </button>
+                  </div>
+                  <div className="flex gap-1 mt-1">
+                    {[0, 4, 6, 8].map((level) => {
+                      const active = riskThreshold === level;
+                      return (
+                        <button
+                          key={level}
+                          onClick={() => onRiskThresholdChange(level)}
+                          className={`flex-1 py-0.5 text-[9px] font-mono tracking-wider border transition-colors rounded-sm ${
+                            active
+                              ? "bg-zinc-900 border-zinc-600 text-zinc-100"
+                              : "bg-transparent border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-400"
+                          }`}
+                        >
+                          {level === 0 ? "ALL" : `≥${level}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="text-[8px] text-zinc-600 mt-0.5 tracking-wide">Classic heatmap glow is always full data. Higher = stricter hex zones only.</div>
+                </div>
+              )}
+
+              {/* Visible risk layer error */}
+              {showRiskHeatmap && riskError && (
+                <div className="mt-2 p-2 text-[9px] bg-zinc-900 border border-red-900/60 border-l-2 border-l-red-500 text-red-400 font-mono tracking-wide">
+                  <div className="flex justify-between items-start gap-2">
+                    <div>
+                      <span className="font-bold">RISK LAYER ERROR</span><br />
+                      {riskError.length > 120 ? riskError.slice(0, 117) + '...' : riskError}
+                    </div>
+                    {onRiskErrorClear && (
+                      <button
+                        onClick={onRiskErrorClear}
+                        className="text-red-400 hover:text-red-300 text-sm leading-none"
+                        aria-label="Dismiss risk error"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                  <div className="mt-1 text-[8px] text-red-500/70">Check Supabase RPC + run heatmap_rpc.sql</div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Active Regions */}
           <div>
-            <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">ACTIVE REGIONS</div>
-            <div className="max-h-60 overflow-y-auto pr-2 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-              {Object.entries(STATE_FIPS).map(([id, state]) => {
+            <div className="ui-section flex items-center justify-between mb-1.5">
+              <span className="flex items-center gap-1.5"><span>◎</span> ACTIVE REGIONS</span>
+              <span className="text-[9px] text-zinc-600">{activeRegions.length}/50</span>
+            </div>
+            <input
+              type="text"
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              placeholder="Filter states (e.g. tex, cal)…"
+              className="ui-input w-full mb-2 px-2 py-1 text-[10px] tracking-wide"
+            />
+            <div className="max-h-52 overflow-y-auto pr-2 space-y-2.5 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+              {Object.entries(STATE_FIPS)
+                .filter(([id, state]) => {
+                  if (!regionFilter) return true;
+                  const q = regionFilter.toLowerCase();
+                  return id.toLowerCase().includes(q) || state.name.toLowerCase().includes(q);
+                })
+                .map(([id, state]) => {
                 const isActive = activeRegions.includes(id);
                 return (
                   <div key={id} className="flex items-center justify-between">
@@ -369,7 +459,9 @@ export default function Sidebar({
 
         {/* ── Statistics ── */}
         <div className="p-4 px-5 border-b border-zinc-900 flex-shrink-0">
-          <div className="text-[9px] font-mono tracking-widest text-zinc-500 font-bold mb-2.5">STATISTICS</div>
+          <div className="ui-section flex items-center gap-1.5">
+            <span>≡</span> STATISTICS
+          </div>
           <div className="flex flex-col gap-2">
             {stats.map(({ label, value, color }) => (
               <div key={label} className="flex justify-between items-baseline">
@@ -410,7 +502,7 @@ export default function Sidebar({
         )}
 
         {/* ── Well list ── */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent well-list">
           {!loading && wells.length === 0 && !error && (
             <div className="p-8 px-5">
               <div className="text-[10px] font-mono tracking-widest text-zinc-500 font-bold mb-2">
@@ -462,11 +554,9 @@ export default function Sidebar({
         </div>
 
         {/* ── Footer / Legend ── */}
-        <div className="p-4 border-t border-zinc-900 flex-shrink-0 flex flex-col gap-2">
+        <div className="p-4 border-t border-zinc-900 flex-shrink-0 flex flex-col gap-2 ui-panel">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-zinc-600 font-mono tracking-widest font-bold">
-              MAP LEGEND
-            </span>
+            <span className="ui-section !mb-0">MAP LEGEND</span>
             {colorMode === "proximity" && searchedLocation && (
               <span className="text-[9px] text-zinc-500 font-mono">PROXIMITY ACTIVE</span>
             )}
@@ -475,45 +565,56 @@ export default function Sidebar({
             {colorMode === "proximity" && searchedLocation ? (
               <>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#ef4444" }} />
+                  <div className="legend-swatch" style={{ background: "#ef4444" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 1MI</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#f97316" }} />
+                  <div className="legend-swatch" style={{ background: "#f97316" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 5MI</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#facc15" }} />
+                  <div className="legend-swatch" style={{ background: "#facc15" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">5+MI</span>
                 </div>
               </>
             ) : (
               <>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm border border-zinc-800" style={{ background: "#f8fafc" }} />
+                  <div className="legend-swatch" style={{ background: "#f8fafc", border: "1px solid #333" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">UNKNOWN</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#facc15" }} />
+                  <div className="legend-swatch" style={{ background: "#facc15" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">&lt; 10YR</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#f97316" }} />
+                  <div className="legend-swatch" style={{ background: "#f97316" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">10-20YR</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-sm" style={{ background: "#ef4444" }} />
+                  <div className="legend-swatch" style={{ background: "#ef4444" }} />
                   <span className="text-[10px] text-zinc-500 font-mono tracking-wider">20+YR</span>
                 </div>
               </>
             )}
             <div className="flex items-center gap-1.5 col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
-              <div className="w-2.5 h-2 rounded-sm" style={{ background: "#0284c7", border: "1px solid #38bdf8" }} />
+              <div className="legend-swatch" style={{ background: "#0284c7", border: "1px solid #38bdf8" }} />
               <span className="text-[10px] text-zinc-500 font-mono tracking-wider">FEMA FLOOD ZONE</span>
             </div>
-            <div className="flex items-center gap-1.5 col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
-              <div className="w-12 h-2 rounded-sm" style={{ background: "linear-gradient(to right, #002296, #0096d6, #78d600, #ffe600, #ff6400, #ff0000)" }} />
-              <span className="text-[10px] text-zinc-500 font-mono tracking-wider">ENVIRONMENTAL RISK INDEX</span>
+
+            {/* Updated for the hex-based hazard zones (clear polygonal areas) */}
+            <div className="col-span-2 mt-0.5 border-t border-zinc-900 pt-1.5">
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="legend-swatch hazard" style={{ background: "linear-gradient(to right, #1e3a8a, #166534, #854d0e, #9a3412, #7f1d1d)" }} />
+                <span className="text-[10px] text-zinc-500 font-mono tracking-wider">ENV. HAZARD (HEATMAP + HEX ZONES)</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 text-[9px] text-zinc-500 font-mono pl-0.5">
+                <div className="flex items-center gap-1"><span className="legend-swatch" style={{background:'#1e3a8a'}}></span> low</div>
+                <div className="flex items-center gap-1"><span className="legend-swatch" style={{background:'#166534'}}></span> mod</div>
+                <div className="flex items-center gap-1"><span className="legend-swatch" style={{background:'#854d0e'}}></span> subst.</div>
+                <div className="flex items-center gap-1"><span className="legend-swatch" style={{background:'#7f1d1d'}}></span> high</div>
+              </div>
+              <div className="text-[8px] text-zinc-600 mt-0.5 pl-0.5 tracking-wide">Hex cells • server-scored (wells + flood + gw)</div>
             </div>
           </div>
         </div>

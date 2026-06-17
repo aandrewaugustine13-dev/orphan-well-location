@@ -46,6 +46,10 @@ export default function Home() {
   const [showFloodZones, setShowFloodZones] = useState(false);
   const [showFrackingSites, setShowFrackingSites] = useState(false);
   const [showRiskHeatmap, setShowRiskHeatmap] = useState(false);
+  // Client-side filter for the hazard viz only. Lets the user focus on
+  // "substantial" risk areas without touching the server RPC or any other layer.
+  const [riskThreshold, setRiskThreshold] = useState<number>(0);
+  const [riskError, setRiskError] = useState<string | null>(null);
 
   const handleWellsLoaded = useCallback((data: Well[]) => setWells(data), []);
   const handleLoadingChange = useCallback((state: boolean) => setLoading(state), []);
@@ -115,9 +119,9 @@ export default function Home() {
             fontSize: "10px",
             fontWeight: 700,
             letterSpacing: "0.18em",
-            color: "#e0e0e0",
-            fontFamily: "var(--font-mono)",
+            color: "#e8e8e8",
           }}
+          className="mono"
         >
           ORPHAN WELL LOCATOR
         </span>
@@ -175,6 +179,9 @@ export default function Home() {
           showFloodZones={showFloodZones}
           showFrackingSites={showFrackingSites}
           showRiskHeatmap={showRiskHeatmap}
+          riskThreshold={riskThreshold}
+          onRiskThresholdChange={setRiskThreshold}
+          onRiskError={setRiskError}
           activeRegions={activeRegions}
           activeFips={activeFips}
         />
@@ -262,6 +269,10 @@ export default function Home() {
             onToggleFrackingSites={handleToggleFrackingSites}
             showRiskHeatmap={showRiskHeatmap}
             onToggleRiskHeatmap={handleToggleRiskHeatmap}
+            riskThreshold={riskThreshold}
+            onRiskThresholdChange={setRiskThreshold}
+            riskError={riskError}
+            onRiskErrorClear={() => setRiskError(null)}
             activeRegions={activeRegions}
             onToggleRegion={handleToggleRegion}
             onNLResult={handleNLResult}

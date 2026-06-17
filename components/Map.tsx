@@ -13,7 +13,7 @@ import {
 } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { DeckOverlay } from "@deck.gl-community/leaflet";
-import { HeatmapLayer } from "@deck.gl/aggregation-layers";
+import { HeatmapLayer, HexagonLayer } from "@deck.gl/aggregation-layers";
 import {
   ColorMode,
   Well,
@@ -50,6 +50,9 @@ interface MapProps {
   showFloodZones: boolean;
   showFrackingSites: boolean;
   showRiskHeatmap: boolean;
+  riskThreshold?: number;
+  onRiskThresholdChange?: (v: number) => void;
+  onRiskError?: (err: string | null) => void;
   activeRegions: string[];
   activeFips: string[];
 }
@@ -126,7 +129,17 @@ function haversineMiles(lat1: number, lng1: number, lat2: number, lng2: number):
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-
+// Coarse grid at low zoom = way fewer cells sent to Deck.gl (big smoothness win).
+function getAdaptiveGridSize(bounds: MapBounds | null, z: number): number {
+  if (!bounds) return 0.02;
+  // Base on zoom primarily; bbox span as fallback.
+  if (z <= 5) return 0.08;
+  if (z <= 6) return 0.045;
+  if (z <= 7) return 0.022;
+  if (z <= 9) return 0.009;
+  if (z <= 11) return 0.0035;
+  return 0.0012;
+}
 
 function MapController({
   programmaticMove,
@@ -177,54 +190,128 @@ function MapController({
 function DeckGLOverlay({
   showRiskHeatmap,
   heatmapData,
+  riskThreshold = 0,
+  zoom = 5,
 }: {
   showRiskHeatmap: boolean;
   heatmapData: HeatmapPoint[];
+  riskThreshold?: number;
+  zoom?: number;
 }) {
   const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
+  const deckRef = useRef<any>(null);
 
+  // Create the DeckOverlay once when the layer is enabled.
+  // Then use setProps() for subsequent data/zoom changes instead of
+  // expensive addLayer/removeLayer on every tick. This is the key to smoothness.
   useEffect(() => {
-    const handleZoom = () => {
-      setZoom(map.getZoom());
-    };
-    map.on("zoomend", handleZoom);
+    if (!showRiskHeatmap) {
+      if (deckRef.current) {
+        try {
+          map.removeLayer(deckRef.current);
+        } catch {}
+        deckRef.current = null;
+      }
+      return;
+    }
+
+    const z = zoom ?? 5;
+
+    // Hexagonal binning for clear "areas of substantial hazard".
+    // The upstream RPC already snaps + scores cells (square grid). HexagonLayer
+    // turns those weighted points into explicit polygonal zones — far better
+    // than Gaussian blur for delineating contiguous ecological/environmental
+    // hazard areas (less directional bias, crisp boundaries, easy to reason
+    // about "this zone here is substantial risk").
+    // We emphasize the upper end of the intensity scale (the "substantial"
+    // part) via lowerPercentile + a danger-weighted color ramp.
+    const hexRadiusMeters = z <= 6 ? 2200 : z <= 8 ? 1450 : z <= 10 ? 950 : 620;
+
+    // Filter is applied here *only* to the hex zones layer.
+  // The classic HeatmapLayer underlay always receives the full raw data so the
+  // density/glow is visible whenever the toggle is on (this fixes the "heatmap doesn't show" case).
+  const zonesData = (riskThreshold && riskThreshold > 0)
+    ? heatmapData.filter((d) => (d.intensity || 0) >= riskThreshold)
+    : heatmapData;
+
+  console.log(`[Deck Risk] Building layers | raw cells=${heatmapData.length} | zones after threshold=${zonesData.length} | zoom=${z} | riskThreshold=${riskThreshold}`);
+
+  const layers = [
+    // Classic heatmap underlay — full raw data → smooth density glow always appears
+    new HeatmapLayer({
+      id: "hazard-underlay",
+      data: heatmapData,
+      getPosition: (d: any) => [d.longitude, d.latitude],
+      getWeight: (d: any) => Number(d.intensity || 1),
+      radiusPixels: z <= 6 ? 160 : z <= 9 ? 95 : 60,
+      intensity: z <= 7 ? 1.4 : 1.0,
+      threshold: 0.015,
+      colorRange: [
+        [0, 34, 150],
+        [0, 150, 214],
+        [120, 214, 0],
+        [255, 230, 0],
+        [255, 100, 0],
+        [255, 0, 0],
+      ],
+      updateTriggers: {
+        getPosition: [heatmapData],
+        getWeight: [heatmapData],
+      },
+    }),
+
+    // Hex zones on top — only the cells that pass the current "MIN HAZARD LEVEL"
+    new HexagonLayer({
+      id: "hazard-zones-hex",
+      data: zonesData,
+      getPosition: (d: any) => [d.longitude, d.latitude],
+      getColorValue: (d: any) => Number(d.intensity || 0),
+      lowerPercentile: 5,
+      upperPercentile: 100,
+      radius: hexRadiusMeters,
+      colorRange: [
+        [30, 55, 95],
+        [45, 95, 130],
+        [140, 160, 45],
+        [235, 175, 30],
+        [245, 115, 25],
+        [230, 45, 25],
+      ],
+      stroked: true,
+      filled: true,
+      lineWidthMinPixels: 0.7,
+      extruded: false,
+      updateTriggers: {
+        getPosition: [zonesData],
+        getColorValue: [zonesData],
+        radius: [z],
+      },
+    }),
+  ];
+
+    if (!deckRef.current) {
+      deckRef.current = new DeckOverlay({ layers });
+      map.addLayer(deckRef.current);
+    } else {
+      // Fast path: mutate the existing overlay instead of full teardown + rebuild.
+      deckRef.current.setProps({ layers });
+    }
+
+    // We intentionally do NOT remove in this return — the removal
+    // happens in the !showRiskHeatmap branch above or on unmount.
+  }, [showRiskHeatmap, heatmapData, riskThreshold, zoom]);
+
+  // Final cleanup when the component is unmounted (toggle off or page nav).
+  useEffect(() => {
     return () => {
-      map.off("zoomend", handleZoom);
+      if (deckRef.current) {
+        try {
+          map.removeLayer(deckRef.current);
+        } catch {}
+        deckRef.current = null;
+      }
     };
   }, [map]);
-
-  useEffect(() => {
-    if (!showRiskHeatmap) return;
-
-    const layers = [
-      new HeatmapLayer({
-        id: "liability-heatmap",
-        data: heatmapData,
-        getPosition: (d: any) => [d.longitude, d.latitude],
-        getWeight: (d: any) => Number(d.intensity || 1),
-        radiusPixels: 90,
-        aggregation: "SUM",
-        colorRange: [
-          [0, 34, 150],    // deep blue
-          [0, 150, 214],   // cyan-blue
-          [120, 214, 0],   // green-yellow
-          [255, 230, 0],   // yellow
-          [255, 100, 0],   // orange
-          [255, 0, 0],     // glowing red
-        ],
-        intensity: 1.5,
-        threshold: 0.03,
-      }),
-    ];
-
-    const deckOverlay = new DeckOverlay({ layers });
-    map.addLayer(deckOverlay);
-
-    return () => {
-      map.removeLayer(deckOverlay);
-    };
-  }, [map, zoom, showRiskHeatmap, heatmapData]);
 
   return null;
 }
@@ -246,6 +333,8 @@ export default function Map({
   showFloodZones: showFemaFloodZones,
   showFrackingSites,
   showRiskHeatmap,
+  riskThreshold = 0,
+  onRiskError,
   activeRegions,
 }: MapProps) {
   const [queryBounds, setQueryBounds] = useState<MapBounds | null>(null);
@@ -258,6 +347,18 @@ export default function Map({
   const [frackingSites, setFrackingSites] = useState<FrackingSite[]>([]);
   const [heatmapData, setHeatmapData] = useState<HeatmapPoint[]>([]);
   const [zoom, setZoom] = useState<number>(DEFAULT_ZOOM);
+  const [riskError, setRiskError] = useState<string | null>(null);
+
+  // Report risk error up to parent for UI display
+  useEffect(() => {
+    onRiskError?.(riskError);
+  }, [riskError, onRiskError]);
+
+  // Client filter for "substantial hazard" focus. Purely visual — does not
+  // affect any other layer, the RPC, or the raw data we keep for the layer.
+  const displayHeatmapData = (riskThreshold && riskThreshold > 0)
+    ? heatmapData.filter((d) => (d.intensity || 0) >= riskThreshold)
+    : heatmapData;
 
   const fetchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
@@ -280,12 +381,29 @@ export default function Map({
     return activeRegions.map(regionAbbr => STATE_FIPS[regionAbbr]?.fips).filter(Boolean);
   }, [activeRegions]);
 
+  // Clear risk error when the layer is toggled off
+  useEffect(() => {
+    if (!showRiskHeatmap) {
+      setRiskError(null);
+    }
+  }, [showRiskHeatmap]);
+
   // Fetch risk heatmap data from Supabase RPC using PostGIS spatial logic
   useEffect(() => {
     async function loadRiskHeatmap() {
       // 1. The Guardrail: If no regions are active, clear the map and stop.
       if (!showRiskHeatmap || !queryBounds || activeRegions.length === 0) {
         setHeatmapData([]);
+        setRiskError(null);
+        return;
+      }
+
+      // 2. Zoom guard: wide viewports (low zoom) pull too many wells and timeout even with indexes.
+      // The adaptive grid helps, but the initial scan + subqueries are expensive.
+      // Raise this threshold if you still see timeouts at medium zooms.
+      if (zoom < 6) {
+        setHeatmapData([]);
+        setRiskError("Zoom in more (zoom level 6+) to load the risk heatmap — prevents DB timeout on large areas");
         return;
       }
 
@@ -293,31 +411,41 @@ export default function Map({
 
       try {
         if (!supabase) return;
-        // 2. The Fetch: Explicitly passing the arrays Supabase expects
+
+        const gridSize = getAdaptiveGridSize(queryBounds, zoom);
+
+        // Pass active regions (for state filtering) + adaptive grid size.
+        // The SQL now uses the grid_size to produce far fewer output cells at overview zooms.
         const { data, error } = await supabase.rpc("get_risk_heatmap_data", {
           min_lng: queryBounds.minLng,
           min_lat: queryBounds.minLat,
           max_lng: queryBounds.maxLng,
           max_lat: queryBounds.maxLat,
-          active_states: activeStateNames, // Now passes ["Texas", "California"]
-          active_fips: activeFips          // Unchanged
+          active_states: activeStateNames,
+          active_fips: activeFips,
+          grid_size: gridSize,
         });
 
         if (requestId !== heatmapRequestIdRef.current) return;
 
         if (error) {
-          console.error("Supabase RPC Error:", error);
+          const msg = error.message || JSON.stringify(error);
+          console.error("Supabase RPC Error for get_risk_heatmap_data:", error);
+          setRiskError(msg);
+          setHeatmapData([]);
           return;
         }
 
+        setRiskError(null);
         setHeatmapData((data as HeatmapPoint[]) ?? []);
+        console.log(`[Risk] RPC returned ${(data as any[] || []).length} cells. raw heatmapData len=${(data as any[] || []).length}, threshold=${riskThreshold}, display will be filtered for zones only.`);
       } catch (err) {
         console.error("Network or parsing error:", err);
       }
     }
 
     loadRiskHeatmap();
-  }, [showRiskHeatmap, queryBounds, activeStateNames, activeFips]);
+  }, [showRiskHeatmap, queryBounds, activeStateNames, activeFips, riskThreshold, zoom]);
 
   const handleMoveEnd = useCallback(
     (bounds: MapBounds, center: [number, number], zoom: number) => {
@@ -610,8 +738,13 @@ export default function Map({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
-        {showRiskHeatmap && (
-          <DeckGLOverlay showRiskHeatmap={showRiskHeatmap} heatmapData={heatmapData} />
+        {showRiskHeatmap && !riskError && (
+          <DeckGLOverlay
+            showRiskHeatmap={showRiskHeatmap}
+            heatmapData={heatmapData} // raw from RPC — underlay always gets full density
+            riskThreshold={riskThreshold}
+            zoom={zoom}
+          />
         )}
 
         {showFemaFloodZones && femaData.map((zone) => (
